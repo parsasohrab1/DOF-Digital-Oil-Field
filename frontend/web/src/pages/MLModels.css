@@ -136,9 +136,26 @@
   border-left: 3px solid #ff4444;
 }
 
+li.drift-alert {
+  color: #ff4444;
+}
+
 .success {
   color: #4caf50;
   font-size: 0.875rem;
+}
+
+.error {
+  color: #ff4444;
+  font-size: 0.875rem;
+}
+
+.delta-up {
+  color: #ff9800;
+}
+
+.delta-down {
+  color: #4caf50;
 }
 
 @media (max-width: 900px) {

@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import joblib
 import mlflow
 import mlflow.sklearn
-import mlflow.keras
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import IsolationForest, RandomForestClassifier
@@ -33,10 +32,17 @@ try:
     from tensorflow import keras
     from tensorflow.keras.models import Sequential
     from tensorflow.keras.layers import LSTM, Dense, Dropout
+    import mlflow.keras
     TENSORFLOW_AVAILABLE = True
 except ImportError:
     TENSORFLOW_AVAILABLE = False
     logger.warning("TensorFlow not available. LSTM models will not work.")
+    # A/B testing, drift detection, anomaly detection and failure prediction
+    # don't touch Keras at all -- previously `import mlflow.keras` at module
+    # level pulled in TensorFlow unconditionally, so its absence took down
+    # the entire module (and every endpoint that depends on it, including
+    # ones with no LSTM/TensorFlow dependency) instead of only disabling
+    # the LSTM-specific paths guarded by TENSORFLOW_AVAILABLE below.
 
 MODEL_REGISTRY_TO_KEY = {
     "anomaly-detection": "anomaly_detection",
