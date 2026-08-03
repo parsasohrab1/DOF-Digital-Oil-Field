@@ -24,24 +24,24 @@ from pydantic import BaseModel, Field
 import uvicorn
 
 # Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'shared'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from database import get_timescale_db, get_db
-from models import SensorData, Tag
-from config import settings
-from logging_config import setup_logging
-from kafka_utils import KafkaProducerWrapper, KafkaConsumerWrapper, KAFKA_TOPICS
-from opcua_client import OPCUAClient, ModbusTCPClient
-from industrial_security import industrial_firewall
-from offline_buffer import OfflineBufferManager
-from connection_monitor import ConnectionMonitor
-from edge_to_stream import edge_to_stream_bridge
-from sensor_health import sensor_health_monitor
-from mqtt_client import get_mqtt_client, MQTTMessageHandler
-from lorawan_client import get_lorawan_client
-from auth import require_authentication, require_roles
-from metrics import setup_metrics
-from tracing import setup_tracing
+from shared.database import get_timescale_db, get_db
+from shared.models import SensorData, Tag
+from shared.config import settings
+from shared.logging_config import setup_logging
+from shared.kafka_utils import KafkaProducerWrapper, KafkaConsumerWrapper, KAFKA_TOPICS
+from shared.opcua_client import OPCUAClient, ModbusTCPClient
+from shared.industrial_security import industrial_firewall
+from shared.offline_buffer import OfflineBufferManager
+from shared.connection_monitor import ConnectionMonitor
+from shared.edge_to_stream import edge_to_stream_bridge
+from shared.sensor_health import sensor_health_monitor
+from shared.mqtt_client import get_mqtt_client, MQTTMessageHandler
+from shared.lorawan_client import get_lorawan_client
+from shared.auth import require_authentication, require_roles
+from shared.metrics import setup_metrics
+from shared.tracing import setup_tracing
 from sqlalchemy.orm import Session
 
 # Setup logging

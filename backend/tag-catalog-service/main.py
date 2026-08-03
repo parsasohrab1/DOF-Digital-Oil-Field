@@ -12,16 +12,16 @@ import sys
 import os
 
 # Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'shared'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from database import get_db
-from models import Tag
-from config import settings
-from logging_config import setup_logging
+from shared.database import get_db
+from shared.models import Tag
+from shared.config import settings
+from shared.logging_config import setup_logging
 from sqlalchemy.orm import Session
-from auth import require_authentication, require_roles
-from metrics import setup_metrics
-from tracing import setup_tracing
+from shared.auth import require_authentication, require_roles
+from shared.metrics import setup_metrics
+from shared.tracing import setup_tracing
 # Role-based dependencies
 require_tag_read = require_authentication
 require_tag_write = require_roles({"system_admin", "data_engineer"})

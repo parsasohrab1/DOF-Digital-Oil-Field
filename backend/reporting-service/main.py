@@ -17,12 +17,12 @@ import httpx
 
 from prometheus_client import Counter, Histogram
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "shared"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from logging_config import setup_logging  # type: ignore
-from metrics import setup_metrics  # type: ignore
-from tracing import setup_tracing  # type: ignore
-from config import settings  # type: ignore
+from shared.logging_config import setup_logging  # type: ignore
+from shared.metrics import setup_metrics  # type: ignore
+from shared.tracing import setup_tracing  # type: ignore
+from shared.config import settings  # type: ignore
 
 logger = setup_logging("reporting-service")
 app = FastAPI(title="OGIM Reporting Service", version="1.0.0")

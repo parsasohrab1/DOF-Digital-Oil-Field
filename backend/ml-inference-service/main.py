@@ -14,13 +14,13 @@ from pydantic import BaseModel
 import numpy as np
 
 # Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'shared'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from config import settings
-from logging_config import setup_logging
+from shared.config import settings
+from shared.logging_config import setup_logging
 from shared.auth import require_roles
-from metrics import setup_metrics
-from tracing import setup_tracing
+from shared.metrics import setup_metrics
+from shared.tracing import setup_tracing
 from rul_model import rul_model_manager
 
 # Import advanced LSTM model

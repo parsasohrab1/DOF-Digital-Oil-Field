@@ -16,15 +16,15 @@ from pydantic import BaseModel, Field
 import uvicorn
 
 # Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'shared'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from config import settings
-from logging_config import setup_logging
-from metrics import setup_metrics
-from tracing import setup_tracing
-from auth import require_authentication, require_roles
-from database import get_db
-from models import Alert, Command
+from shared.config import settings
+from shared.logging_config import setup_logging
+from shared.metrics import setup_metrics
+from shared.tracing import setup_tracing
+from shared.auth import require_authentication, require_roles
+from shared.database import get_db
+from shared.models import Alert, Command
 from sqlalchemy.orm import Session
 
 # Setup logging

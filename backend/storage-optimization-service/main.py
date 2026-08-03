@@ -13,17 +13,17 @@ from pydantic import BaseModel, Field
 import uvicorn
 
 # Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'shared'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from config import settings
-from logging_config import setup_logging
-from metrics import setup_metrics
-from tracing import setup_tracing
-from auth import require_authentication, require_roles
-from database import get_timescale_db
-from compression_manager import compression_manager
-from timescale_cluster import cluster_manager
-from sql_safety import validate_hypertable_name, validate_interval_literal
+from shared.config import settings
+from shared.logging_config import setup_logging
+from shared.metrics import setup_metrics
+from shared.tracing import setup_tracing
+from shared.auth import require_authentication, require_roles
+from shared.database import get_timescale_db
+from shared.compression_manager import compression_manager
+from shared.timescale_cluster import cluster_manager
+from shared.sql_safety import validate_hypertable_name, validate_interval_literal
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 

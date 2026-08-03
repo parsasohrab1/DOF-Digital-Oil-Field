@@ -16,14 +16,14 @@ import json
 
 from prometheus_client import Counter, Histogram
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "shared"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from logging_config import setup_logging  # type: ignore
-from metrics import setup_metrics  # type: ignore
-from tracing import setup_tracing  # type: ignore
-from config import settings
-from auth import require_authentication
-from database import get_timescale_db
+from shared.logging_config import setup_logging  # type: ignore
+from shared.metrics import setup_metrics  # type: ignore
+from shared.tracing import setup_tracing  # type: ignore
+from shared.config import settings
+from shared.auth import require_authentication
+from shared.database import get_timescale_db
 from sqlalchemy.orm import Session
 
 logger = setup_logging("digital-twin-service")

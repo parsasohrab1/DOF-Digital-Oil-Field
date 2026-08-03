@@ -13,16 +13,16 @@ import os
 import uuid
 
 # Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'shared'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from database import get_db
-from models import Alert, AlertRule, User
-from config import settings
-from logging_config import setup_logging
-from kafka_utils import KafkaProducerWrapper, KAFKA_TOPICS
-from auth import require_authentication, require_roles
-from tracing import setup_tracing
-from metrics import setup_metrics
+from shared.database import get_db
+from shared.models import Alert, AlertRule, User
+from shared.config import settings
+from shared.logging_config import setup_logging
+from shared.kafka_utils import KafkaProducerWrapper, KAFKA_TOPICS
+from shared.auth import require_authentication, require_roles
+from shared.tracing import setup_tracing
+from shared.metrics import setup_metrics
 from sqlalchemy.orm import Session
 import httpx
 import asyncio

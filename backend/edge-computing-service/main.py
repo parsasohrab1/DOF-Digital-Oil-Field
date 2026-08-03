@@ -17,15 +17,15 @@ from pydantic import BaseModel, Field
 import uvicorn
 
 # Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'shared'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from config import settings
-from logging_config import setup_logging
-from metrics import setup_metrics
-from tracing import setup_tracing
-from auth import require_authentication, require_roles
-from disconnected_operation import get_disconnected_op_manager
-from connection_monitor import ConnectionMonitor
+from shared.config import settings
+from shared.logging_config import setup_logging
+from shared.metrics import setup_metrics
+from shared.tracing import setup_tracing
+from shared.auth import require_authentication, require_roles
+from shared.disconnected_operation import get_disconnected_op_manager
+from shared.connection_monitor import ConnectionMonitor
 
 # Setup logging
 logger = setup_logging("edge-computing-service")
