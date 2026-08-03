@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import time
+import httpx
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 try:
@@ -398,7 +399,17 @@ async def ingest_data(
             payload_bytes += len(json.dumps(record.dict(), default=str).encode("utf-8"))
 
         tsdb.commit()
-        
+
+        # Push straight to the Gateway's realtime WebSocket stream so
+        # dashboards see new readings within one HTTP hop instead of waiting
+        # for the Gateway's next poll cycle (previously up to 1s).
+        if validated_records:
+            background_tasks.add_task(
+                push_to_gateway_realtime,
+                validated_records,
+                request.source,
+            )
+
         # Publish to Kafka or buffer if offline
         if validated_records:
             if connection_monitor and not connection_monitor.is_online:
@@ -473,6 +484,32 @@ def buffer_records(records: List[dict], source: str):
             BUFFERED_RECORDS.labels(source=source).inc()
     
     logger.info(f"Buffered {buffered_count}/{len(records)} records from {source}")
+
+
+GATEWAY_REALTIME_PUSH_URL = (
+    f"http://{os.getenv('SERVICE_HOST', 'localhost')}:8000/internal/realtime/publish"
+)
+
+
+async def push_to_gateway_realtime(records: List[dict], source: str):
+    """Push freshly-ingested records straight to the Gateway's realtime
+    WebSocket stream, instead of relying on the Gateway polling
+    data-ingestion's REST endpoint once a second. Best-effort: a failure here
+    must never affect the ingest response, since Kafka/the buffer remain the
+    durable path for this data.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            await client.post(
+                GATEWAY_REALTIME_PUSH_URL,
+                headers={"X-Internal-Token": settings.INTERNAL_SERVICE_TOKEN},
+                json={
+                    "type": "sensor_data",
+                    "data": {"sensor_records": records, "source": source},
+                },
+            )
+    except Exception as e:
+        logger.debug(f"Realtime push to gateway failed (non-fatal): {e}")
 
 
 def publish_to_kafka(records: List[dict], source: str):

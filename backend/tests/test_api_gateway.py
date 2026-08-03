@@ -173,3 +173,39 @@ def test_security_siem_events_endpoint():
     assert "events" in body
     assert "summary" in body
 
+
+def test_internal_realtime_publish_rejects_wrong_token():
+    response = client.post(
+        "/internal/realtime/publish",
+        headers={"X-Internal-Token": "not-the-real-token"},
+        json={"type": "sensor_data", "data": {"sensor_records": []}},
+    )
+    assert response.status_code == 401
+
+
+def test_realtime_websocket_delivers_pushed_event_immediately():
+    """Regression test for data-ingestion -> Gateway WebSocket wiring.
+
+    Previously the WebSocket loop only ever polled data-ingestion's REST
+    endpoint once a second; a service pushing to /internal/realtime/publish
+    must now reach a connected client without waiting for that poll cycle.
+    """
+    from shared.security import create_access_token
+
+    token = create_access_token(data={"sub": "test-user", "role": "field_operator"})
+
+    with client.websocket_connect(f"/stream/realtime/ws?token={token}") as websocket:
+        publish_response = client.post(
+            "/internal/realtime/publish",
+            headers={"X-Internal-Token": api_gateway.settings.INTERNAL_SERVICE_TOKEN},
+            json={
+                "type": "sensor_data",
+                "data": {"sensor_records": [{"sensor_id": "WELL-1-pressure", "value": 123.4}]},
+            },
+        )
+        assert publish_response.status_code == 200
+
+        message = websocket.receive_json()
+        assert message["type"] == "sensor_data"
+        assert message["data"]["sensor_records"][0]["sensor_id"] == "WELL-1-pressure"
+

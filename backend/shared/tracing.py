@@ -45,6 +45,19 @@ def setup_tracing(
     """
     Configure OpenTelemetry tracer for a FastAPI application.
     """
+    # Standard OTel env var (https://opentelemetry.io/docs/languages/sdk-configuration/general/):
+    # use a no-op tracer instead of a real BatchSpanProcessor/OTLPSpanExporter
+    # pair. Without this, every process that imports a service's main.py (each
+    # test file, in particular) starts a background export thread that
+    # retries against an unreachable collector forever; at interpreter exit,
+    # each one's atexit shutdown hook blocks joining that thread, so a test
+    # run with several services loaded can take a very long time to actually
+    # return control even after all tests have passed.
+    if os.getenv("OTEL_SDK_DISABLED", "false").lower() == "true":
+        trace.set_tracer_provider(trace.NoOpTracerProvider())
+        logger.info("Tracing disabled for %s (OTEL_SDK_DISABLED=true)", service_name)
+        return
+
     resource = Resource.create(
         {
             "service.name": service_name,

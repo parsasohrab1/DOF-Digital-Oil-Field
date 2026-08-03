@@ -4,6 +4,13 @@ PyTest configuration and fixtures
 import pytest
 import sys
 import os
+
+# Every service's main.py calls shared.tracing.setup_tracing() at import time,
+# which otherwise starts a real OTLP exporter thread per test module that
+# retries against an unreachable collector (see shared/tracing.py). Must be
+# set before any service module is imported below.
+os.environ.setdefault("OTEL_SDK_DISABLED", "true")
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool

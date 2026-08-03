@@ -235,6 +235,13 @@ class Settings(BaseSettings):
     API_GATEWAY_UPSTREAM_TIMEOUT_SECONDS: int = Field(default=15, env="API_GATEWAY_UPSTREAM_TIMEOUT_SECONDS")
     API_GATEWAY_HTTP_KEEPALIVE_CONNECTIONS: int = Field(default=100, env="API_GATEWAY_HTTP_KEEPALIVE_CONNECTIONS")
     API_GATEWAY_HTTP_MAX_CONNECTIONS: int = Field(default=300, env="API_GATEWAY_HTTP_MAX_CONNECTIONS")
+
+    # Shared secret for service-to-service pushes into the Gateway's realtime
+    # WebSocket stream (see POST /internal/realtime/publish). Not a user-facing
+    # credential -- change it per environment via env var like any other secret.
+    INTERNAL_SERVICE_TOKEN: str = Field(
+        default="dev-internal-token-change-in-production", env="INTERNAL_SERVICE_TOKEN"
+    )
     API_SECURITY_MAX_BODY_BYTES: int = Field(default=1024 * 1024, env="API_SECURITY_MAX_BODY_BYTES")
     API_SECURITY_MAX_QUERY_PARAMS: int = Field(default=50, env="API_SECURITY_MAX_QUERY_PARAMS")
     API_SECURITY_MAX_PARAM_LENGTH: int = Field(default=1024, env="API_SECURITY_MAX_PARAM_LENGTH")
