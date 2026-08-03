@@ -4,7 +4,7 @@ Specialized ML models for oil field equipment RUL prediction
 """
 import logging
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 import os
 import sys

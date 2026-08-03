@@ -1,13 +1,20 @@
+import importlib.util
 import os
 import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "reporting-service"))
+MODULE_PATH = Path(__file__).resolve().parents[1] / "reporting-service" / "main.py"
+spec = importlib.util.spec_from_file_location("reporting_service_main", MODULE_PATH)
+reporting_service_main = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(reporting_service_main)
 
-from main import app, reports_db  # type: ignore
+app = reporting_service_main.app
+reports_db = reporting_service_main.reports_db
 
 
 @pytest.fixture(autouse=True)

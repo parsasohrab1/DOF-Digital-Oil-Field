@@ -431,6 +431,16 @@ async def ingest_data(
             records_ingested=len(validated_records),
             source=request.source
         )
+    except HTTPException:
+        # Preserve the specific status code/detail from the validation checks
+        # above (422 unknown sensor, mismatch, out-of-range, ...) instead of
+        # falling through to the generic 400 handler below.
+        duration = time.perf_counter() - start_time
+        INGEST_LATENCY.labels(source=request.source).observe(duration)
+        INGEST_RECORDS_PER_REQUEST.labels(source=request.source).observe(len(validated_records))
+        if payload_bytes:
+            INGEST_PAYLOAD_BYTES.labels(source=request.source).inc(payload_bytes)
+        raise
     except Exception as e:
         duration = time.perf_counter() - start_time
         INGEST_LATENCY.labels(source=request.source).observe(duration)

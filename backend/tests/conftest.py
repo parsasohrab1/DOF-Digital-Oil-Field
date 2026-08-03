@@ -6,6 +6,7 @@ import sys
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
 # Add backend root to path for shared package imports
@@ -15,20 +16,24 @@ from shared.database import Base
 from shared.models import User
 from shared.security import get_password_hash
 
-# Test database URL
-TEST_DATABASE_URL = "sqlite:///./test.db"
 
-
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def test_engine():
-    """Create test database engine"""
+    """Create a fresh in-memory test database engine per test.
+
+    Function-scoped (not session-scoped) so tests that share fixed usernames
+    like "testuser"/"admin" (test_user, admin_user) never collide on unique
+    constraints from data left behind by an earlier test in the same session.
+    """
     engine = create_engine(
-        TEST_DATABASE_URL,
-        connect_args={"check_same_thread": False}
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
     yield engine
     Base.metadata.drop_all(bind=engine)
+    engine.dispose()
 
 
 @pytest.fixture(scope="function")

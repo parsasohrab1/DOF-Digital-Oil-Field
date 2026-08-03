@@ -1,15 +1,26 @@
 """
 Tests for tag catalog service
 """
+import importlib.util
 import pytest
 import sys
 import os
+from pathlib import Path
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tag-catalog-service'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from main import app, require_tag_read, require_tag_write, require_tag_admin
+MODULE_PATH = Path(__file__).resolve().parents[1] / "tag-catalog-service" / "main.py"
+spec = importlib.util.spec_from_file_location("tag_catalog_service_main", MODULE_PATH)
+tag_catalog_service_main = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(tag_catalog_service_main)
+
+app = tag_catalog_service_main.app
+require_tag_read = tag_catalog_service_main.require_tag_read
+require_tag_write = tag_catalog_service_main.require_tag_write
+require_tag_admin = tag_catalog_service_main.require_tag_admin
+
 from shared.database import get_db
 from shared.models import Tag
 from shared.auth import require_authentication, require_roles

@@ -1,13 +1,23 @@
+import importlib.util
 import os
 import sys
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "command-control-service"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from main import app, require_command_read, require_command_admin  # type: ignore
+MODULE_PATH = Path(__file__).resolve().parents[1] / "command-control-service" / "main.py"
+spec = importlib.util.spec_from_file_location("command_control_service_main", MODULE_PATH)
+command_control_service_main = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(command_control_service_main)
+
+app = command_control_service_main.app
+require_command_read = command_control_service_main.require_command_read
+require_command_admin = command_control_service_main.require_command_admin
+
 from shared.database import get_db
 
 
@@ -21,12 +31,29 @@ def override_get_db(test_db):
     return _override
 
 
+class _FakeCommandProducer:
+    """Stands in for the real Kafka producer in tests.
+
+    execute_command() intentionally raises (-> 500) when no producer is
+    available at all, since a command that isn't actually relayed to SCADA
+    must not be reported as successfully executed. That's correct production
+    behavior, not something to bypass here -- so tests exercising the success
+    path need a producer that accepts sends, not None.
+    """
+
+    def send(self, *args, **kwargs):
+        pass
+
+    def flush(self, *args, **kwargs):
+        pass
+
+
 @pytest.fixture
 def client(test_db, test_user, admin_user, monkeypatch):
     app.dependency_overrides[get_db] = override_get_db(test_db)
     app.dependency_overrides[require_command_read] = lambda: {"sub": test_user.username, "role": test_user.role}
     app.dependency_overrides[require_command_admin] = lambda: {"sub": admin_user.username, "role": admin_user.role}
-    monkeypatch.setattr("main.command_producer", None)
+    monkeypatch.setattr(command_control_service_main, "command_producer", _FakeCommandProducer())
     test_client = TestClient(app)
     yield test_client
     app.dependency_overrides.clear()

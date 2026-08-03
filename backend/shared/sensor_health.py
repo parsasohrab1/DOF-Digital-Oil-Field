@@ -4,7 +4,7 @@ Automated detection of sensor drift and data correction before ML models
 """
 import logging
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from collections import deque
 from dataclasses import dataclass

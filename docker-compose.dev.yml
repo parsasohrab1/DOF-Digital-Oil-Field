@@ -80,8 +80,8 @@ services:
   # Backend Services
   api-gateway:
     build:
-      context: ./backend/api-gateway
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: api-gateway/Dockerfile
     container_name: ogim-api-gateway
     ports:
       - "8000:8000"
@@ -99,8 +99,8 @@ services:
 
   auth-service:
     build:
-      context: ./backend/auth-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: auth-service/Dockerfile
     container_name: ogim-auth-service
     ports:
       - "8001:8001"
@@ -115,8 +115,8 @@ services:
 
   data-ingestion-service:
     build:
-      context: ./backend/data-ingestion-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: data-ingestion-service/Dockerfile
     container_name: ogim-data-ingestion
     ports:
       - "8002:8002"
@@ -133,8 +133,8 @@ services:
 
   ml-inference-service:
     build:
-      context: ./backend/ml-inference-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: ml-inference-service/Dockerfile
     container_name: ogim-ml-inference
     ports:
       - "8003:8003"
@@ -147,8 +147,8 @@ services:
 
   alert-service:
     build:
-      context: ./backend/alert-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: alert-service/Dockerfile
     container_name: ogim-alert-service
     ports:
       - "8004:8004"
@@ -165,8 +165,8 @@ services:
 
   reporting-service:
     build:
-      context: ./backend/reporting-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: reporting-service/Dockerfile
     container_name: ogim-reporting
     ports:
       - "8005:8005"
@@ -183,8 +183,8 @@ services:
 
   command-control-service:
     build:
-      context: ./backend/command-control-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: command-control-service/Dockerfile
     container_name: ogim-command-control
     ports:
       - "8006:8006"
@@ -201,8 +201,8 @@ services:
 
   tag-catalog-service:
     build:
-      context: ./backend/tag-catalog-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: tag-catalog-service/Dockerfile
     container_name: ogim-tag-catalog
     ports:
       - "8007:8007"
@@ -216,8 +216,8 @@ services:
 
   digital-twin-service:
     build:
-      context: ./backend/digital-twin-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: digital-twin-service/Dockerfile
     container_name: ogim-digital-twin
     ports:
       - "8008:8008"

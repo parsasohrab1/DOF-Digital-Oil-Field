@@ -23,6 +23,9 @@ from shared.metrics import setup_metrics
 from shared.tracing import setup_tracing
 from rul_model import rul_model_manager
 
+# Setup logging
+logger = setup_logging("ml-inference-service")
+
 # Import advanced LSTM model
 try:
     from advanced_lstm_model import AdvancedLSTMModel, get_well_model
@@ -53,9 +56,6 @@ try:
 except ImportError:  # pragma: no cover - dependency optional at runtime
     METRICS_ENABLED = False
     INFERENCE_REQUESTS = INFERENCE_ERRORS = INFERENCE_LATENCY = None  # type: ignore
-
-# Setup logging
-logger = setup_logging("ml-inference-service")
 
 # Import MLflow integration
 try:

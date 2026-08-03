@@ -11,8 +11,8 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from collections import deque
 
-from kafka_utils import KafkaLowLatencyProducerWrapper
-from config import settings
+from .kafka_utils import create_low_latency_producer
+from .config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +34,7 @@ class EdgeToStreamBridge:
     def initialize(self):
         """Initialize Kafka producer with low-latency settings"""
         try:
-            self.kafka_producer = KafkaLowLatencyProducerWrapper(
-                bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-                topic="raw-sensor-data"
-            )
+            self.kafka_producer = create_low_latency_producer(topic="raw-sensor-data")
             logger.info("Edge-to-Stream bridge initialized")
         except Exception as e:
             logger.error(f"Failed to initialize Edge-to-Stream bridge: {e}")
