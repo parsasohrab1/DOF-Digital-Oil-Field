@@ -126,8 +126,14 @@ SAFE_HEADERS_ALLOWLIST = {
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
+PUBLIC_AUTH_PATHS = {"api/auth/token", "api/auth/refresh", "api/auth/health"}
+
+
 async def authenticate_request(request: Request):
     """Validate authentication token"""
+    if request.url.path.strip("/") in PUBLIC_AUTH_PATHS:
+        return None
+
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         raise HTTPException(status_code=401, detail="Missing authorization token")
@@ -249,6 +255,8 @@ def _ip_allowed_in_zero_trust(ip: str) -> bool:
 async def enforce_zero_trust(request: Request, service_name: str):
     """Apply zero-trust checks before service proxying."""
     if not settings.ZERO_TRUST_ENFORCED:
+        return True
+    if request.url.path.strip("/") in PUBLIC_AUTH_PATHS:
         return True
 
     ip = _client_ip(request)

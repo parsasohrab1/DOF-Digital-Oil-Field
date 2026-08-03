@@ -12,12 +12,12 @@ import uvicorn
 import sys
 import os
 
-# Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'shared'))
+# Add backend root to path so `shared` is importable as a package
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from database import get_db
-from models import User
-from security import (
+from shared.database import get_db
+from shared.models import User
+from shared.security import (
     verify_password,
     get_password_hash,
     create_access_token,
@@ -28,15 +28,15 @@ from security import (
     generate_2fa_qr_code_uri,
     extract_token_jti,
 )
-from config import settings
-from logging_config import setup_logging
+from shared.config import settings
+from shared.logging_config import setup_logging
 from sqlalchemy.orm import Session
-from rate_limiter import rate_limit_dependency
-from token_store import refresh_token_store
-from security_alerts import security_alerts
-from metrics import setup_metrics
-from tracing import setup_tracing
-from threat_detection import siem_logger, threat_detector
+from shared.rate_limiter import rate_limit_dependency
+from shared.token_store import refresh_token_store
+from shared.security_alerts import security_alerts
+from shared.metrics import setup_metrics
+from shared.tracing import setup_tracing
+from shared.threat_detection import siem_logger, threat_detector
 
 # Setup logging
 logger = setup_logging("auth-service")
