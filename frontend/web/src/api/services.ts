@@ -293,6 +293,34 @@ export const mlAPI = {
   },
 }
 
+// Federated Learning API
+export const federatedAPI = {
+  getNodes: async () => {
+    const response = await apiClient.get('/api/ml-inference/federated/nodes')
+    return response.data
+  },
+
+  getGlobalModel: async () => {
+    const response = await apiClient.get('/api/ml-inference/federated/global-model')
+    return response.data
+  },
+
+  trainAndSubmit: async (nodeId: string, payload: {
+    well_name: string
+    location: string
+    samples: Record<string, number>[]
+    labels: number[]
+  }) => {
+    const response = await apiClient.post(`/api/ml-inference/federated/nodes/${nodeId}/train-and-submit`, payload)
+    return response.data
+  },
+
+  aggregate: async (minNodes: number = 2) => {
+    const response = await apiClient.post('/api/ml-inference/federated/aggregate', { min_nodes: minNodes })
+    return response.data
+  },
+}
+
 // Storage Optimization API
 export const storageAPI = {
   getStorageStats: async () => {
@@ -566,6 +594,7 @@ export default {
   commands: commandAPI,
   reports: reportingAPI,
   ml: mlAPI,
+  federated: federatedAPI,
   digitalTwin: digitalTwinAPI,
   dvr: dvrAPI,
   remoteOps: remoteOpsAPI,

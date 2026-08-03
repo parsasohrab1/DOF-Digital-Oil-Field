@@ -130,3 +130,92 @@ class TestABTesting:
             json={"baseline_version": 1, "candidate_version": 2, "candidate_weight": 0.5},
         )
         assert response.status_code == 400
+
+
+class TestFederatedLearning:
+    """Regression coverage for the federated learning coordinator: previously
+    this whole feature was a frontend-only mock (hardcoded nodes, Math.random()
+    training history) with no backend at all."""
+
+    @pytest.fixture(autouse=True)
+    def reset_coordinator(self):
+        # federated_coordinator is a module-level singleton shared by every
+        # test in this class (the module is loaded once at collection time),
+        # so each test needs a clean slate.
+        coordinator = ml_inference_service_main.federated_coordinator
+        coordinator.nodes.clear()
+        coordinator.round_number = 0
+        coordinator.global_weights = None
+        coordinator.global_accuracy = None
+        coordinator.round_history.clear()
+        yield
+
+    def _submit(self, client, node_id, well_name, weights, accuracy, data_size):
+        return client.post(
+            f"/federated/nodes/{node_id}/update",
+            json={
+                "well_name": well_name,
+                "location": "Field Test",
+                "local_weights": weights,
+                "local_accuracy": accuracy,
+                "data_size": data_size,
+            },
+        )
+
+    def test_submit_rejects_wrong_weight_dimension(self, client):
+        response = self._submit(client, "NODE-BAD", "WELL-X", [1.0, 2.0], 0.9, 100)
+        assert response.status_code == 400
+
+    def test_aggregate_requires_minimum_nodes(self, client):
+        response = client.post("/federated/nodes/NODE-SOLO/update", json={
+            "well_name": "WELL-1", "location": "Field A",
+            "local_weights": [0.1, 0.2, 0.3, 0.4, 0.5], "local_accuracy": 0.9, "data_size": 100,
+        })
+        assert response.status_code == 200
+
+        agg_response = client.post("/federated/aggregate", json={"min_nodes": 2})
+        assert agg_response.status_code == 400
+
+    def test_fedavg_is_correctly_weighted_by_data_size(self, client):
+        # Two nodes with very different weights and very different dataset
+        # sizes: the aggregate must land close to the larger node's weights,
+        # not a plain unweighted average.
+        self._submit(client, "NODE-SMALL", "WELL-1", [0.0, 0.0, 0.0, 0.0, 0.0], 0.80, 10)
+        self._submit(client, "NODE-BIG", "WELL-2", [10.0, 10.0, 10.0, 10.0, 10.0], 0.90, 990)
+
+        response = client.post("/federated/aggregate", json={"min_nodes": 2})
+        assert response.status_code == 200
+        body = response.json()
+        assert body["round"] == 1
+        # weighted average: 0*10/1000 + 10*990/1000 == 9.9, nowhere near the
+        # unweighted average of 5.0
+        assert all(w > 9.0 for w in body["global_weights"])
+        assert 0.89 < body["global_accuracy"] < 0.90
+
+        nodes_response = client.get("/federated/nodes")
+        assert nodes_response.status_code == 200
+        assert len(nodes_response.json()["nodes"]) == 2
+
+        global_response = client.get("/federated/global-model")
+        assert global_response.status_code == 200
+        assert global_response.json()["global_model"]["round"] == 1
+        assert len(global_response.json()["round_history"]) == 1
+
+    def test_train_and_submit_fits_a_real_local_model(self, client):
+        samples = [
+            {"pressure": 300 + i, "temperature": 80 + i * 0.1, "flow_rate": 400, "vibration": 0.1}
+            for i in range(20)
+        ] + [
+            {"pressure": 600 + i, "temperature": 95 + i * 0.1, "flow_rate": 700, "vibration": 0.9}
+            for i in range(20)
+        ]
+        labels = [0.0] * 20 + [1.0] * 20
+
+        response = client.post(
+            "/federated/nodes/NODE-TRAIN/train-and-submit",
+            json={"well_name": "WELL-3", "location": "Field C", "samples": samples, "labels": labels},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["data_size"] == 40
+        assert body["local_accuracy"] > 0.8  # this is a trivially separable dataset
