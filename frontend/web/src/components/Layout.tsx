@@ -1,7 +1,8 @@
-import { ReactNode, useEffect } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { kpiAPI } from '../api/services'
+import { isOfflineLiveForced, shouldUseLocalLive } from '../api/offlineMode'
 import './Layout.css'
 
 interface LayoutProps {
@@ -17,8 +18,21 @@ function featureFromPath(pathname: string): string {
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const { user } = useAuth()
+  const [offlineLive, setOfflineLive] = useState(() => shouldUseLocalLive())
 
   useEffect(() => {
+    const sync = () => setOfflineLive(shouldUseLocalLive())
+    window.addEventListener('online', sync)
+    window.addEventListener('offline', sync)
+    sync()
+    return () => {
+      window.removeEventListener('online', sync)
+      window.removeEventListener('offline', sync)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (shouldUseLocalLive()) return
     const feature = featureFromPath(location.pathname)
     kpiAPI.recordFeatureUsage(feature).catch(() => {
       /* non-blocking adoption metric */
@@ -34,6 +48,11 @@ export default function Layout({ children }: LayoutProps) {
         </div>
         {user && (
           <div className="nav-user">
+            {(offlineLive || isOfflineLiveForced()) && (
+              <span className="offline-live-badge" title="اجرای زنده بدون نیاز به اینترنت یا بک‌اند">
+                زنده آفلاین
+              </span>
+            )}
             <span>
               {user.username} ({roleFa(user.role)})
             </span>
@@ -96,6 +115,7 @@ function roleFa(role: string) {
     data_engineer: 'مهندس داده',
     viewer: 'بازدیدکننده',
     admin: 'مدیر',
+    offline_operator: 'اپراتور آفلاین',
     guest: 'مهمان',
   }
   return map[role] || role

@@ -13,6 +13,8 @@ import {
   Area,
 } from 'recharts'
 import { alertAPI } from '../api/services'
+import { transportLabelFa } from '../api/offlineMode'
+import { getDehloranAlerts } from '../data/dehloranAlerts'
 import { useWebSocket } from '../hooks/useWebSocket'
 import {
   FIELD,
@@ -112,12 +114,24 @@ export default function Dashboard() {
 
   const { data: alertsData } = useQuery({
     queryKey: ['alerts', 'open', 'dehloran'],
-    queryFn: () => alertAPI.getAlerts({ status: 'open' }),
-    refetchInterval: transport === 'disconnected' ? 30000 : 20000,
-    retry: 1,
+    queryFn: async () => {
+      try {
+        const data = await alertAPI.getAlerts()
+        const list = data?.alerts || []
+        if (Array.isArray(list) && list.length > 0) {
+          return { count: list.filter((a: any) => a.status === 'open').length, alerts: list }
+        }
+      } catch {
+        /* local */
+      }
+      const alerts = getDehloranAlerts()
+      return { count: alerts.filter((a) => a.status === 'open').length, alerts }
+    },
+    refetchInterval: 12000,
+    retry: false,
   })
 
-  const openAlerts = alertsData?.count ?? totals.warning + totals.critical
+  const openAlerts = alertsData?.count ?? getDehloranAlerts().filter((a) => a.status === 'open').length
   const wcSeries = useMemo(() => waterCutForecast(totals.avgWc), [totals.avgWc])
   const declineSeries = useMemo(() => declineForecast(totals.oil), [totals.oil])
 
@@ -146,12 +160,7 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="deh-stream">
-          جریان زنده:{' '}
-          {transport === 'websocket'
-            ? 'وب‌سوکت'
-            : transport === 'sse'
-              ? 'رویداد سمت سرور'
-              : 'شبیه‌سازی میدان'}
+          جریان زنده: {transportLabelFa(transport)}
           {autoPilotOn && <span className="ap-badge"> · اپراتور هوشمند</span>}
         </div>
       </header>

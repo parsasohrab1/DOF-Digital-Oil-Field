@@ -1,9 +1,9 @@
-const CACHE_NAME = 'ogim-v1'
-const PRECACHE_URLS = ['/', '/index.html']
+const CACHE_NAME = 'ogim-offline-v2'
+const PRECACHE_URLS = ['/', '/index.html', '/manifest.json']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)).catch(() => undefined)
   )
   self.skipWaiting()
 })
@@ -21,37 +21,70 @@ self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
 
-  // Network-first for API calls, cache-first for static assets
-  if (request.url.includes('/api/') || request.url.includes('/stream/') || request.url.includes('/kpi/')) {
+  const url = new URL(request.url)
+  if (url.origin !== self.location.origin) return
+
+  const isApi =
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/stream/') ||
+    url.pathname.startsWith('/kpi/') ||
+    url.pathname.startsWith('/security/')
+
+  if (isApi) {
+    // API: شبکه اول؛ در خطا پاسخ خالی/کش
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+          if (response.ok) {
+            const clone = response.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+          }
           return response
         })
-        .catch(() => caches.match(request))
+        .catch(() =>
+          caches.match(request).then(
+            (cached) =>
+              cached ||
+              new Response(JSON.stringify({ offline: true, alerts: [], count: 0 }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              })
+          )
+        )
     )
-  } else {
-    event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request))
-    )
+    return
   }
+
+  // استاتیک / اپ: کش اول، سپس شبکه و ذخیره برای آفلاین بعدی
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      const networkFetch = fetch(request)
+        .then((response) => {
+          if (response && response.ok) {
+            const clone = response.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+          }
+          return response
+        })
+        .catch(() => cached)
+      return cached || networkFetch
+    })
+  )
 })
 
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : {}
-  const title = data.title || 'SOGF Alert'
+  const title = data.title || 'هشدار میدان دهلران'
   const options = {
-    body: data.body || 'New critical alert',
+    body: data.body || 'هشدار جدید',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     tag: data.tag || 'ogim-alert',
     data: { url: data.url || '/alerts' },
     vibrate: [200, 100, 200],
     actions: [
-      { action: 'view', title: 'View Alert' },
-      { action: 'dismiss', title: 'Dismiss' },
+      { action: 'view', title: 'مشاهده' },
+      { action: 'dismiss', title: 'بستن' },
     ],
   }
   event.waitUntil(self.registration.showNotification(title, options))

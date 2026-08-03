@@ -93,8 +93,9 @@
   font-weight: 600;
 }
 
-.perf-transport.websocket { color: #95d5b2; }
-.perf-transport.sse { color: #ffd166; }
+.perf-transport.websocket { color: #2e7d32; }
+.perf-transport.sse { color: #f57f17; }
+.perf-transport.simulation { color: #1565c0; }
 .perf-transport.disconnected { color: #555555; }
 
 .perf-hint {

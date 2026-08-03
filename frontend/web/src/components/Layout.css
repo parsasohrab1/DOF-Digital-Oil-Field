@@ -35,6 +35,18 @@
   white-space: nowrap;
 }
 
+.offline-live-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #e8f5e9;
+  border: 1px solid #81c784;
+  color: #1b5e20;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .nav-user button {
   padding: 0.35rem 0.75rem;
   border-radius: 4px;

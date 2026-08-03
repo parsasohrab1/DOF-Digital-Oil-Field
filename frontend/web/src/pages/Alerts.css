@@ -159,6 +159,12 @@
   color: #f57f17;
 }
 
+.transport-badge.simulation,
+.transport-badge.disconnected {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
 .tab-buttons button {
   padding: 0.4rem 0.8rem;
   border: 1px solid #e0e0e0;

@@ -1,66 +1,67 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
+import { getApiBaseUrl } from './config'
+import { shouldUseLocalLive } from './offlineMode'
 
-// API base URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const API_BASE_URL = getApiBaseUrl()
 
-// Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  // در حالت آفلاین سریع شکست بخور تا fallback محلی فعال شود
+  timeout: shouldUseLocalLive() ? 2500 : 30000,
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
-// Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
-    // Add auth token if available
+    if (shouldUseLocalLive()) {
+      // درخواست‌های API در حالت آفلاین را زود قطع کن
+      config.timeout = Math.min(config.timeout ?? 2500, 2500)
+    }
+
     const token = localStorage.getItem('access_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
-    
-    // Add correlation ID for tracing
+
     config.headers['X-Correlation-ID'] = generateCorrelationId()
-    
     return config
   },
-  (error) => {
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )
 
-// Response interceptor
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    // Silently handle network errors - services may not be running
-    if (error.code === 'ERR_NETWORK' || error.code === 'ERR_EMPTY_RESPONSE' || error.message?.includes('Failed to fetch')) {
-      // Don't log network errors - they're expected when services are not running
-      // Return a rejected promise with a custom error that can be handled
+    if (
+      error.code === 'ERR_NETWORK' ||
+      error.code === 'ERR_EMPTY_RESPONSE' ||
+      error.code === 'ECONNABORTED' ||
+      error.message?.includes('Failed to fetch') ||
+      error.message?.includes('timeout')
+    ) {
       const networkError = {
         ...error,
         isNetworkError: true,
         message: 'Service unavailable',
-        code: error.code || 'ERR_EMPTY_RESPONSE'
+        code: error.code || 'ERR_NETWORK',
       }
       return Promise.reject(networkError)
     }
 
     if (error.response?.status === 401) {
-      // Login removed — clear stale tokens but do not redirect
       const refreshToken = localStorage.getItem('refresh_token')
-      if (refreshToken) {
+      if (refreshToken && !shouldUseLocalLive()) {
         try {
           const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
-            refresh_token: refreshToken
+            refresh_token: refreshToken,
           })
-          
+
           const { access_token, refresh_token: newRefreshToken } = response.data
           localStorage.setItem('access_token', access_token)
           localStorage.setItem('refresh_token', newRefreshToken)
-          
+
           if (error.config) {
             error.config.headers.Authorization = `Bearer ${access_token}`
             return apiClient.request(error.config)
@@ -71,15 +72,13 @@ apiClient.interceptors.response.use(
         }
       }
     }
-    
+
     return Promise.reject(error)
   }
 )
 
-// Helper function to generate correlation ID
 function generateCorrelationId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
 export default apiClient
-

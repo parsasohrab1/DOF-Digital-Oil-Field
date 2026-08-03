@@ -12,6 +12,7 @@ function statusClass(status?: string): string {
 function transportFa(transport: string) {
   if (transport === 'websocket') return 'وب‌سوکت'
   if (transport === 'sse') return 'رویداد سمت سرور'
+  if (transport === 'simulation') return 'زنده محلی (بدون اینترنت)'
   if (transport === 'disconnected') return 'در این صفحه مشترک نیست'
   return transport
 }

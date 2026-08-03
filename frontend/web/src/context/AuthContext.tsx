@@ -1,5 +1,6 @@
 import { useEffect, useState, ReactNode } from 'react'
 import { authAPI } from '../api/services'
+import { shouldUseLocalLive } from '../api/offlineMode'
 import type { AuthUser } from './authContextTypes'
 import { AuthContext } from './auth-context'
 
@@ -12,20 +13,43 @@ const GUEST_USER: AuthUser = {
   two_factor_enabled: false,
 }
 
+const OFFLINE_USER: AuthUser = {
+  id: 1,
+  username: 'offline_operator',
+  email: 'offline@dehloran.local',
+  role: 'system_admin',
+  disabled: false,
+  two_factor_enabled: false,
+}
+
 const DEV_USERNAME = 'admin'
 const DEV_PASSWORD = 'Admin@123'
 
+/** توکن ساختگی محلی فقط برای عبور از گیت‌های کلاینت — در سرور اعتبار ندارد */
+function ensureOfflineToken() {
+  if (!localStorage.getItem('access_token')) {
+    localStorage.setItem('access_token', 'offline-live-token')
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(GUEST_USER)
+  const [user, setUser] = useState<AuthUser | null>(
+    shouldUseLocalLive() ? OFFLINE_USER : GUEST_USER
+  )
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
 
     const bootstrap = async () => {
-      // Prefer existing token if present
+      if (shouldUseLocalLive()) {
+        ensureOfflineToken()
+        if (!cancelled) setUser(OFFLINE_USER)
+        return
+      }
+
       const existing = localStorage.getItem('access_token')
-      if (existing) {
+      if (existing && existing !== 'offline-live-token') {
         try {
           const currentUser = await authAPI.getCurrentUser()
           if (!cancelled) setUser(currentUser)
@@ -36,7 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Silent auto-login so API calls work without a login screen
       try {
         const tokenResponse = await authAPI.login(DEV_USERNAME, DEV_PASSWORD)
         localStorage.setItem('access_token', tokenResponse.access_token)
@@ -44,8 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const currentUser = await authAPI.getCurrentUser()
         if (!cancelled) setUser(currentUser)
       } catch {
-        // Auth service unavailable — keep guest session for open UI access
-        if (!cancelled) setUser(GUEST_USER)
+        ensureOfflineToken()
+        if (!cancelled) setUser(OFFLINE_USER)
       }
     }
 
@@ -56,6 +79,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = async (username: string, password: string) => {
+    if (shouldUseLocalLive()) {
+      ensureOfflineToken()
+      setUser({ ...OFFLINE_USER, username })
+      return
+    }
     const tokenResponse = await authAPI.login(username, password)
     localStorage.setItem('access_token', tokenResponse.access_token)
     localStorage.setItem('refresh_token', tokenResponse.refresh_token)
@@ -64,7 +92,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
-    authAPI.logout()
+    try {
+      authAPI.logout()
+    } catch {
+      /* offline */
+    }
+    if (shouldUseLocalLive()) {
+      ensureOfflineToken()
+      setUser(OFFLINE_USER)
+      return
+    }
     setUser(GUEST_USER)
   }
 

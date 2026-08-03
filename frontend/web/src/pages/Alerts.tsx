@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useAuth } from '../hooks/useAuth'
 import { alertAPI } from '../api/services'
+import { transportLabelFa } from '../api/offlineMode'
 import {
   buildAlertSmsText,
   getDehloranAlerts,
@@ -433,11 +434,7 @@ export default function Alerts() {
         <h2>هشدارها</h2>
         <div className="alerts-toolbar-right">
           <span className={`transport-badge ${transport}`}>
-            {transport === 'websocket'
-              ? 'زنده (وب‌سوکت)'
-              : transport === 'sse'
-                ? 'زنده (رویداد سمت سرور)'
-                : 'شبیه‌سازی میدان'}
+            {transportLabelFa(transport)}
           </span>
           <div className="tab-buttons">
             <button className={tab === 'all' ? 'active' : ''} onClick={() => setTab('all')}>
