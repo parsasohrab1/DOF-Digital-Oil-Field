@@ -17,9 +17,13 @@ depends_on = None
 def upgrade() -> None:
     op.add_column(
         "commands",
-        sa.Column("stage", sa.String(length=30), nullable=False, server_default="requested"),
+        sa.Column(
+            "stage", sa.String(length=30), nullable=False, server_default="requested"
+        ),
     )
-    op.add_column("commands", sa.Column("two_fa_verified_at", sa.DateTime(), nullable=True))
+    op.add_column(
+        "commands", sa.Column("two_fa_verified_at", sa.DateTime(), nullable=True)
+    )
     op.add_column("commands", sa.Column("simulation_result", sa.JSON(), nullable=True))
     op.add_column("commands", sa.Column("approval_notes", sa.Text(), nullable=True))
     op.add_column(

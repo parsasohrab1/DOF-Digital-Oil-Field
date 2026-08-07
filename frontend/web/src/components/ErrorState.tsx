@@ -5,12 +5,12 @@ interface ErrorStateProps {
   onRetry?: () => void
 }
 
-export default function ErrorState({ message = 'Failed to load data from the backend.', onRetry }: ErrorStateProps) {
+export default function ErrorState({ message = 'بارگذاری داده از سرور ناموفق بود.', onRetry }: ErrorStateProps) {
   return (
-    <div className="error-state">
+    <div className="error-state" dir="rtl">
       <p>{message}</p>
       {onRetry && (
-        <button onClick={onRetry}>Retry</button>
+        <button onClick={onRetry}>تلاش مجدد</button>
       )}
     </div>
   )

@@ -35,3 +35,17 @@ def test_validate_query_params():
     assert validate_query_params({"well": "PROD-001"}) == []
     errors = validate_query_params({"q": "<script>"})
     assert "suspicious_query_param" in errors
+
+
+@pytest.mark.unit
+def test_scan_payload_non_string_returns_false():
+    assert scan_payload_for_attacks(42) is False
+    assert scan_payload_for_attacks(None) is False
+    assert scan_payload_for_attacks(3.14) is False
+
+
+@pytest.mark.unit
+def test_validate_query_params_length_exceeded():
+    long_val = "x" * 2000
+    errors = validate_query_params({"q": long_val}, max_length=1024)
+    assert "parameter_length_exceeded" in errors

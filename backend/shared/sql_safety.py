@@ -10,7 +10,9 @@ import re
 from sqlalchemy import text
 
 _COLUMN_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*(\s+(ASC|DESC))?$", re.IGNORECASE)
-_INTERVAL_RE = re.compile(r"^\d+\s+(day|days|hour|hours|minute|minutes|week|weeks)$", re.IGNORECASE)
+_INTERVAL_RE = re.compile(
+    r"^\d+\s+(day|days|hour|hours|minute|minutes|week|weeks)$", re.IGNORECASE
+)
 
 
 def validate_hypertable_name(conn, table_name: str) -> str:
@@ -21,7 +23,9 @@ def validate_hypertable_name(conn, table_name: str) -> str:
     drifts as hypertables are added/removed.
     """
     result = conn.execute(
-        text("SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = :name"),
+        text(
+            "SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = :name"
+        ),
         {"name": table_name},
     )
     if result.fetchone() is None:

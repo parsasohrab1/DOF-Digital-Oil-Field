@@ -1,6 +1,6 @@
-# OGIM Web Portal
+# SOGF Web Portal
 
-React + TypeScript web portal for Oil & Gas Intelligent Monitoring System.
+React + TypeScript web portal for SOGF - Smartening Oil & Gas Fields.
 
 ## Setup
 

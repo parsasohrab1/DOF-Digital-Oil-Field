@@ -4,22 +4,22 @@
   align-items: center;
   gap: 0.75rem;
   padding: 2rem;
-  border: 1px solid #7f1d1d;
+  border: 1px solid #ef9a9a;
   border-radius: 6px;
-  background: #2a1414;
-  color: #fca5a5;
+  background: #fff5f5;
+  color: #b71c1c;
   text-align: center;
 }
 
 .error-state button {
   padding: 0.4rem 1rem;
   border-radius: 4px;
-  border: 1px solid #7f1d1d;
-  background: #3f1d1d;
-  color: #fecaca;
+  border: 1px solid #e57373;
+  background: #ffffff;
+  color: #b71c1c;
   cursor: pointer;
 }
 
 .error-state button:hover {
-  background: #4a1f1f;
+  background: #ffebee;
 }

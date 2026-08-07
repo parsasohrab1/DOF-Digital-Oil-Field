@@ -6,8 +6,8 @@
 }
 
 .kpi-card {
-  background: #1e1e1e;
-  border: 1px solid #333;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
   border-radius: 8px;
   padding: 0.75rem;
   border-left: 3px solid #666;
@@ -19,7 +19,7 @@
 .kpi-card strong {
   display: block;
   font-size: 0.8rem;
-  color: #888;
+  color: #555555;
 }
 
 .kpi-value {
@@ -65,8 +65,8 @@
 }
 
 .perf-card {
-  background: #1e1e1e;
-  border: 1px solid #333;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
   border-radius: 8px;
   padding: 1rem;
 }
@@ -77,7 +77,7 @@
 
 .perf-card h3 {
   margin: 0 0 0.75rem;
-  color: #aaa;
+  color: #555555;
   font-size: 1rem;
 }
 
@@ -93,13 +93,14 @@
   font-weight: 600;
 }
 
-.perf-transport.websocket { color: #95d5b2; }
-.perf-transport.sse { color: #ffd166; }
-.perf-transport.disconnected { color: #888; }
+.perf-transport.websocket { color: #2e7d32; }
+.perf-transport.sse { color: #f57f17; }
+.perf-transport.simulation { color: #1565c0; }
+.perf-transport.disconnected { color: #555555; }
 
 .perf-hint {
   font-size: 0.8rem;
-  color: #888;
+  color: #555555;
   margin-top: 0.5rem;
 }
 
@@ -110,7 +111,7 @@
 }
 
 .perf-panel-item {
-  background: #2a2a2a;
+  background: #f5f5f5;
   padding: 0.75rem;
   border-radius: 6px;
   display: flex;
@@ -120,7 +121,7 @@
 }
 
 .perf-panel-item span {
-  color: #888;
+  color: #555555;
 }
 
 .perf-sla-table {
@@ -133,7 +134,7 @@
 .perf-sla-table td {
   text-align: left;
   padding: 0.5rem;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 @media (max-width: 900px) {

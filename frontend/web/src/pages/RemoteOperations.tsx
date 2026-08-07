@@ -3,15 +3,6 @@ import { useState } from 'react'
 import apiClient from '../api/client'
 import './RemoteOperations.css'
 
-interface Operation {
-  operation_id: string
-  operation_type: string
-  status: string
-  command_id?: string
-  message: string
-  timestamp: string
-}
-
 export default function RemoteOperations() {
   const [selectedOperation, setSelectedOperation] = useState<string>('')
   const queryClient = useQueryClient()
@@ -55,8 +46,9 @@ export default function RemoteOperations() {
       const response = await apiClient.post('/api/remote-operations/setpoint/adjust', data)
       return response.data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['operations'] })
+      setSelectedOperation(data.operation_id)
       alert('Setpoint adjustment requested successfully')
     },
   })
@@ -67,8 +59,9 @@ export default function RemoteOperations() {
       const response = await apiClient.post('/api/remote-operations/equipment/control', data)
       return response.data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['operations'] })
+      setSelectedOperation(data.operation_id)
       alert('Equipment control command sent successfully')
     },
   })
@@ -79,8 +72,9 @@ export default function RemoteOperations() {
       const response = await apiClient.post('/api/remote-operations/valve/control', data)
       return response.data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['operations'] })
+      setSelectedOperation(data.operation_id)
       alert('Valve control command sent successfully')
     },
   })
@@ -91,8 +85,9 @@ export default function RemoteOperations() {
       const response = await apiClient.post('/api/remote-operations/emergency/shutdown', data)
       return response.data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['operations'] })
+      setSelectedOperation(data.operation_id)
       alert('EMERGENCY SHUTDOWN INITIATED!')
     },
   })

@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 class CommandStage(Enum):
     """Command workflow stages"""
+
     REQUESTED = "requested"
     TWO_FA_VERIFIED = "two_fa_verified"
     DIGITAL_TWIN_SIMULATION = "digital_twin_simulation"
@@ -132,11 +133,15 @@ class SecureCommandWorkflow:
         command.two_fa_verified_at = datetime.utcnow()
         db.commit()
 
-        logger.info(f"Command {command_id} - 2FA verified, proceeding to Digital Twin simulation")
+        logger.info(
+            f"Command {command_id} - 2FA verified, proceeding to Digital Twin simulation"
+        )
 
         return await self.run_digital_twin_simulation(db, command_id)
 
-    async def run_digital_twin_simulation(self, db: Session, command_id: str) -> Dict[str, Any]:
+    async def run_digital_twin_simulation(
+        self, db: Session, command_id: str
+    ) -> Dict[str, Any]:
         """Stage 3: run Digital Twin simulation before execution."""
         command = self._get_command(db, command_id)
 
@@ -225,7 +230,9 @@ class SecureCommandWorkflow:
         command.approval_notes = approval_notes
         db.commit()
 
-        logger.info(f"Command {command_id} - Simulation approved by {approver.username}")
+        logger.info(
+            f"Command {command_id} - Simulation approved by {approver.username}"
+        )
 
         return {
             "command_id": command_id,
@@ -246,19 +253,25 @@ class SecureCommandWorkflow:
         }
 
         if command.critical and self._critical_command_producer:
-            self._critical_command_producer.send(command.command_id, command_data, flush_immediately=False)
+            self._critical_command_producer.send(
+                command.command_id, command_data, flush_immediately=False
+            )
         elif self._command_producer:
             self._command_producer.send(command.command_id, command_data)
             self._command_producer.flush()
         else:
             raise RuntimeError("No Kafka producer available")
 
-    async def execute_command(self, db: Session, command_id: str, executor: User) -> Dict[str, Any]:
+    async def execute_command(
+        self, db: Session, command_id: str, executor: User
+    ) -> Dict[str, Any]:
         """Stage 5: execute the command by publishing it to Kafka for SCADA/PLC pickup."""
         command = self._get_command(db, command_id)
 
         if command.stage != CommandStage.SIMULATION_APPROVED.value:
-            return {"error": "Command must be 2FA-verified, simulated, and approved before execution"}
+            return {
+                "error": "Command must be 2FA-verified, simulated, and approved before execution"
+            }
 
         command.status = "executing"
         db.commit()
@@ -286,7 +299,9 @@ class SecureCommandWorkflow:
         }
         db.commit()
 
-        logger.info(f"Command {command_id} - Executed successfully by {executor.username}")
+        logger.info(
+            f"Command {command_id} - Executed successfully by {executor.username}"
+        )
 
         return {
             "command_id": command_id,
@@ -295,7 +310,9 @@ class SecureCommandWorkflow:
             "execution_timestamp": command.executed_at.isoformat(),
         }
 
-    async def execute_immediately(self, db: Session, command: Command, executor: User) -> Dict[str, Any]:
+    async def execute_immediately(
+        self, db: Session, command: Command, executor: User
+    ) -> Dict[str, Any]:
         """
         Bypass the 2FA/simulation/approval gates and publish straight to Kafka.
 
@@ -308,7 +325,9 @@ class SecureCommandWorkflow:
         try:
             self._publish(command)
         except Exception as e:
-            logger.error(f"Failed to publish emergency command {command.command_id} to Kafka: {e}")
+            logger.error(
+                f"Failed to publish emergency command {command.command_id} to Kafka: {e}"
+            )
             command.stage = CommandStage.FAILED.value
             command.status = "failed"
             db.commit()
@@ -328,7 +347,9 @@ class SecureCommandWorkflow:
         }
         db.commit()
 
-        logger.critical(f"Command {command.command_id} - Executed immediately by {executor.username} (no approval gate)")
+        logger.critical(
+            f"Command {command.command_id} - Executed immediately by {executor.username} (no approval gate)"
+        )
 
         return {
             "command_id": command.command_id,
@@ -337,7 +358,9 @@ class SecureCommandWorkflow:
             "execution_timestamp": command.executed_at.isoformat(),
         }
 
-    def get_command_status(self, db: Session, command_id: str) -> Optional[Dict[str, Any]]:
+    def get_command_status(
+        self, db: Session, command_id: str
+    ) -> Optional[Dict[str, Any]]:
         """Get current status of a command"""
         command = db.query(Command).filter(Command.command_id == command_id).first()
         if not command:

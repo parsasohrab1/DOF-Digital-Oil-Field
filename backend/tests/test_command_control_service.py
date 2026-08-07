@@ -54,6 +54,7 @@ def client(test_db, test_user, admin_user, monkeypatch):
     app.dependency_overrides[require_command_read] = lambda: {"sub": test_user.username, "role": test_user.role}
     app.dependency_overrides[require_command_admin] = lambda: {"sub": admin_user.username, "role": admin_user.role}
     monkeypatch.setattr(command_control_service_main, "command_producer", _FakeCommandProducer())
+    monkeypatch.setattr(command_control_service_main, "critical_command_producer", _FakeCommandProducer())
     test_client = TestClient(app)
     yield test_client
     app.dependency_overrides.clear()

@@ -9,6 +9,14 @@ function statusClass(status?: string): string {
   return status === 'ok' ? 'kpi-ok' : status === 'warning' ? 'kpi-warn' : 'kpi-neutral'
 }
 
+function transportFa(transport: string) {
+  if (transport === 'websocket') return 'وب‌سوکت'
+  if (transport === 'sse') return 'رویداد سمت سرور'
+  if (transport === 'simulation') return 'زنده محلی (بدون اینترنت)'
+  if (transport === 'disconnected') return 'در این صفحه مشترک نیست'
+  return transport
+}
+
 export default function Performance() {
   const { transport } = useWebSocket({ enabled: false })
 
@@ -28,74 +36,74 @@ export default function Performance() {
   const cache = cacheQuery.data
 
   const panels = [
-    { title: 'Request Rate', desc: 'service_requests_total by service' },
-    { title: 'Error Rate', desc: 'service_request_errors_total by service' },
-    { title: 'P95 Latency', desc: 'service_request_latency_seconds (API Gateway)' },
-    { title: 'ML Inference', desc: 'ml_inference_latency_seconds by model_type' },
+    { title: 'نرخ درخواست', desc: 'service_requests_total به‌ازای سرویس' },
+    { title: 'نرخ خطا', desc: 'service_request_errors_total به‌ازای سرویس' },
+    { title: 'تأخیر صدک ۹۵', desc: 'service_request_latency_seconds (درگاه برنامه‌نویسی)' },
+    { title: 'استنتاج یادگیری ماشین', desc: 'ml_inference_latency_seconds به‌ازای نوع مدل' },
   ]
 
   return (
-    <div className="perf-page">
+    <div className="perf-page" dir="rtl">
       <div className="perf-header">
-        <h2>APM & Executive KPIs</h2>
+        <h2>عملکرد سامانه و شاخص‌های اجرایی</h2>
         <a href={GRAFANA_URL} target="_blank" rel="noopener noreferrer" className="perf-grafana-link">
-          Open Grafana Dashboard
+          باز کردن داشبورد گرافانا
         </a>
       </div>
 
       <div className="kpi-grid">
         <div className={`kpi-card ${statusClass(kpi?.latency?.status)}`}>
-          <strong>Latency P95</strong>
+          <strong>تأخیر صدک ۹۵</strong>
           <span className="kpi-value">{kpi?.latency?.p95_ms ?? '—'} ms</span>
-          <small>Target: &lt; {kpi?.latency?.target_p95_ms ?? 100} ms</small>
+          <small>هدف: &lt; {kpi?.latency?.target_p95_ms ?? 100} ms</small>
         </div>
         <div className={`kpi-card ${statusClass(kpi?.uptime?.status)}`}>
-          <strong>Uptime</strong>
+          <strong>دسترس‌پذیری</strong>
           <span className="kpi-value">{kpi?.uptime?.ratio != null ? `${(kpi.uptime.ratio * 100).toFixed(2)}%` : '—'}</span>
-          <small>Target: ≥ {(kpi?.uptime?.target_ratio ?? 0.999) * 100}%</small>
+          <small>هدف: ≥ {(kpi?.uptime?.target_ratio ?? 0.999) * 100}%</small>
         </div>
         <div className={`kpi-card ${statusClass(kpi?.adoption?.status)}`}>
-          <strong>Adoption</strong>
-          <span className="kpi-value">{kpi?.adoption?.total_events ?? 0} events</span>
-          <small>{Object.keys(kpi?.adoption?.feature_hits ?? {}).length} features used</small>
+          <strong>پذیرش قابلیت‌ها</strong>
+          <span className="kpi-value">{kpi?.adoption?.total_events ?? 0} رویداد</span>
+          <small>{Object.keys(kpi?.adoption?.feature_hits ?? {}).length} قابلیت استفاده‌شده</small>
         </div>
         <div className={`kpi-card ${statusClass(kpi?.alert_quality?.status)}`}>
-          <strong>False Positive Rate</strong>
+          <strong>نرخ هشدار کاذب</strong>
           <span className="kpi-value">
             {kpi?.alert_quality?.false_positive_rate != null
               ? `${(kpi.alert_quality.false_positive_rate * 100).toFixed(1)}%`
               : '—'}
           </span>
-          <small>Target: ≤ {(kpi?.alert_quality?.target_max_false_positive_rate ?? 0.3) * 100}%</small>
+          <small>هدف: ≤ {(kpi?.alert_quality?.target_max_false_positive_rate ?? 0.3) * 100}%</small>
         </div>
       </div>
 
       <div className="perf-stack">
         <section className="perf-card">
-          <h3>API Response Cache</h3>
-          <p>Hit rate: {cache?.hit_rate != null ? `${(cache.hit_rate * 100).toFixed(1)}%` : '—'}</p>
-          <p>Entries: {cache?.entries ?? 0} | Hits: {cache?.hits ?? 0} | Misses: {cache?.misses ?? 0}</p>
+          <h3>کش پاسخ درگاه</h3>
+          <p>نرخ برخورد: {cache?.hit_rate != null ? `${(cache.hit_rate * 100).toFixed(1)}%` : '—'}</p>
+          <p>ورودی‌ها: {cache?.entries ?? 0} | برخورد: {cache?.hits ?? 0} | ازدست‌رفته: {cache?.misses ?? 0}</p>
         </section>
 
         <section className="perf-card">
-          <h3>Real-time Transport</h3>
+          <h3>انتقال بلادرنگ</h3>
           <p className={`perf-transport ${transport}`}>
-            {transport === 'disconnected' ? 'Not subscribed on this page' : transport}
+            {transportFa(transport)}
           </p>
         </section>
 
         <section className="perf-card full">
-          <h3>Observability Stack</h3>
+          <h3>پشته مشاهده‌پذیری</h3>
           <ul className="perf-list">
             <li><strong>OpenTelemetry</strong> → Tempo</li>
-            <li><strong>Prometheus</strong> + executive-kpis.yml alerts</li>
-            <li><strong>Grafana</strong> — OGIM APM Overview</li>
-            <li><strong>Security</strong> — Zero Trust, SIEM, threat detection</li>
+            <li><strong>Prometheus</strong> + هشدارهای executive-kpis.yml</li>
+            <li><strong>گرافانا</strong> — نمای کلی پایش عملکرد سامانه هوشمندسازی میادین</li>
+            <li><strong>امنیت</strong> — اعتماد صفر، مدیریت رویداد امنیتی، تشخیص تهدید</li>
           </ul>
         </section>
 
         <section className="perf-card full">
-          <h3>Key Metrics Panels</h3>
+          <h3>پنل‌های شاخص کلیدی</h3>
           <div className="perf-panels-grid">
             {panels.map((p) => (
               <div key={p.title} className="perf-panel-item">

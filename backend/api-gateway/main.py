@@ -2,7 +2,16 @@
 API Gateway Service
 Single entry point for all UI and API requests
 """
-from fastapi import FastAPI, Request, HTTPException, Depends, WebSocket, WebSocketDisconnect, Query
+from fastapi import (
+    FastAPI,
+    Request,
+    HTTPException,
+    Depends,
+    WebSocket,
+    WebSocketDisconnect,
+    Query,
+    Body,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.responses import JSONResponse, Response, StreamingResponse
@@ -22,27 +31,39 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.config import settings
 from shared.security import decode_token
 from shared.metrics import setup_metrics
+
 try:
     from shared.tracing import setup_tracing
 except Exception:  # pragma: no cover - fallback for lean test/runtime environments
+
     def setup_tracing(*args, **kwargs):
         logger.warning("Tracing disabled: OpenTelemetry dependencies unavailable")
+
+
 from shared.advanced_rate_limiter import get_rate_limiter, RateLimitConfig
 from shared.mtls_manager import get_mtls_manager
 from shared.threat_detection import siem_logger, threat_detector
-from shared.input_validation import contains_suspicious_content, scan_payload_for_attacks
+from shared.input_validation import (
+    contains_suspicious_content,
+    scan_payload_for_attacks,
+)
 from shared.response_cache import TTLResponseCache
-from shared.kpi_metrics import get_executive_summary, record_latency, record_uptime_check
+from shared.kpi_metrics import (
+    get_executive_summary,
+    record_feature_usage,
+    record_latency,
+    record_uptime_check,
+)
 
 app = FastAPI(
-    title="OGIM API Gateway",
-    description="API Gateway for Oil & Gas Intelligent Monitoring System",
-    version="1.0.0"
+    title="SOGF API Gateway",
+    description="API Gateway for SOGF - Smartening Oil & Gas Fields",
+    version="1.0.0",
 )
 
 setup_metrics(app, "api-gateway")
@@ -56,7 +77,7 @@ mtls_manager = get_mtls_manager(
     cert_dir=settings.MTLS_CERT_DIR,
     ca_cert_path=settings.MTLS_CA_CERT_PATH,
     client_cert_path=settings.MTLS_CLIENT_CERT_PATH,
-    client_key_path=settings.MTLS_CLIENT_KEY_PATH
+    client_key_path=settings.MTLS_CLIENT_KEY_PATH,
 )
 
 # CORS Configuration
@@ -70,26 +91,26 @@ app.add_middleware(
 
 security = HTTPBearer()
 
-# Service discovery (in production, use service mesh or discovery service)
-# Use localhost for local development, service names for Docker
-import os
-SERVICE_HOST = os.getenv("SERVICE_HOST", "localhost")  # Default to localhost for local dev
-
+# Service discovery (in production, use service mesh or discovery service).
+# Each upstream is reachable by its docker-compose service name on the shared
+# network - these come straight from shared/config.py so a single source of
+# truth defines both. A single shared SERVICE_HOST would break this: every
+# service is its own container, not all reachable at one hostname.
 SERVICES = {
-    "auth": f"http://{SERVICE_HOST}:8001",
-    "data-ingestion": f"http://{SERVICE_HOST}:8002",
-    "ml-inference": f"http://{SERVICE_HOST}:8003",
-    "alert": f"http://{SERVICE_HOST}:8004",
-    "reporting": f"http://{SERVICE_HOST}:8005",
-    "command-control": f"http://{SERVICE_HOST}:8006",
-    "tag-catalog": f"http://{SERVICE_HOST}:8007",
-    "digital-twin": f"http://{SERVICE_HOST}:8008",
-    "edge-computing": f"http://{SERVICE_HOST}:8009",
-    "erp-integration": f"http://{SERVICE_HOST}:8010",
-    "dvr": f"http://{SERVICE_HOST}:8011",
-    "remote-operations": f"http://{SERVICE_HOST}:8012",
-    "data-variables": f"http://{SERVICE_HOST}:8013",
-    "storage-optimization": f"http://{SERVICE_HOST}:8014",
+    "auth": settings.AUTH_SERVICE_URL,
+    "data-ingestion": settings.DATA_INGESTION_SERVICE_URL,
+    "ml-inference": settings.ML_INFERENCE_SERVICE_URL,
+    "alert": settings.ALERT_SERVICE_URL,
+    "reporting": settings.REPORTING_SERVICE_URL,
+    "command-control": settings.COMMAND_CONTROL_SERVICE_URL,
+    "tag-catalog": settings.TAG_CATALOG_SERVICE_URL,
+    "digital-twin": settings.DIGITAL_TWIN_SERVICE_URL,
+    "edge-computing": settings.EDGE_SERVICE_URL,
+    "erp-integration": settings.ERP_SERVICE_URL,
+    "dvr": settings.DVR_SERVICE_URL,
+    "remote-operations": settings.REMOTE_OPERATIONS_SERVICE_URL,
+    "data-variables": settings.DATA_VARIABLES_SERVICE_URL,
+    "storage-optimization": settings.STORAGE_OPTIMIZATION_SERVICE_URL,
 }
 
 SERVICE_ROLE_REQUIREMENTS = {
@@ -119,9 +140,20 @@ CACHEABLE_GET_PREFIXES = (
     "/api/tag-catalog/tags",
 )
 SAFE_HEADERS_ALLOWLIST = {
-    "accept", "accept-encoding", "accept-language", "authorization", "cache-control",
-    "content-type", "if-none-match", "origin", "referer", "user-agent", "x-correlation-id",
-    "x-request-id", "x-forwarded-for", "x-real-ip",
+    "accept",
+    "accept-encoding",
+    "accept-language",
+    "authorization",
+    "cache-control",
+    "content-type",
+    "if-none-match",
+    "origin",
+    "referer",
+    "user-agent",
+    "x-correlation-id",
+    "x-request-id",
+    "x-forwarded-for",
+    "x-real-ip",
 }
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
@@ -191,15 +223,27 @@ async def validate_and_harden_request(request: Request, service_name: str, path:
         raise HTTPException(status_code=400, detail="Too many query parameters")
 
     for key, value in request.query_params.multi_items():
-        if len(key) > settings.API_SECURITY_MAX_PARAM_LENGTH or len(value) > settings.API_SECURITY_MAX_PARAM_LENGTH:
-            raise HTTPException(status_code=400, detail="Query parameter length exceeded")
+        if (
+            len(key) > settings.API_SECURITY_MAX_PARAM_LENGTH
+            or len(value) > settings.API_SECURITY_MAX_PARAM_LENGTH
+        ):
+            raise HTTPException(
+                status_code=400, detail="Query parameter length exceeded"
+            )
         if _contains_suspicious_content(key) or _contains_suspicious_content(value):
             siem_logger.emit(
                 "request_blocked_suspicious_query",
                 "high",
-                {"ip": _client_ip(request), "service": service_name, "path": path, "query_key": key},
+                {
+                    "ip": _client_ip(request),
+                    "service": service_name,
+                    "path": path,
+                    "query_key": key,
+                },
             )
-            raise HTTPException(status_code=400, detail="Request contains blocked input patterns")
+            raise HTTPException(
+                status_code=400, detail="Request contains blocked input patterns"
+            )
 
     body = None
     if request.method in WRITE_METHODS:
@@ -219,7 +263,9 @@ async def validate_and_harden_request(request: Request, service_name: str, path:
                     "critical",
                     {"ip": _client_ip(request), "service": service_name, "path": path},
                 )
-                raise HTTPException(status_code=400, detail="Request contains blocked input patterns")
+                raise HTTPException(
+                    status_code=400, detail="Request contains blocked input patterns"
+                )
     return body
 
 
@@ -227,7 +273,13 @@ def _sanitize_forward_headers(request_headers: Dict[str, str]) -> Dict[str, str]
     sanitized = {}
     for key, value in request_headers.items():
         normalized = key.lower()
-        if normalized in {"host", "content-length", "connection", "transfer-encoding", "upgrade"}:
+        if normalized in {
+            "host",
+            "content-length",
+            "connection",
+            "transfer-encoding",
+            "upgrade",
+        }:
             continue
         if normalized in SAFE_HEADERS_ALLOWLIST or normalized.startswith("x-"):
             sanitized[key] = value
@@ -266,7 +318,9 @@ async def enforce_zero_trust(request: Request, service_name: str):
             "high",
             {"ip": ip, "path": request.url.path, "service": service_name},
         )
-        raise HTTPException(status_code=403, detail="Access denied by zero trust policy")
+        raise HTTPException(
+            status_code=403, detail="Access denied by zero trust policy"
+        )
 
     user = getattr(request.state, "user", {}) or {}
     role = user.get("role")
@@ -276,7 +330,9 @@ async def enforce_zero_trust(request: Request, service_name: str):
             "high",
             {"ip": ip, "path": request.url.path, "service": service_name},
         )
-        raise HTTPException(status_code=401, detail="Role is required by zero trust policy")
+        raise HTTPException(
+            status_code=401, detail="Role is required by zero trust policy"
+        )
     return True
 
 
@@ -284,32 +340,32 @@ async def check_rate_limit(request: Request, service_name: str):
     """Check rate limit for request"""
     if not settings.RATE_LIMIT_ENABLED:
         return True
-    
+
     # Get client identifier
     client_ip = request.client.host if request.client else "unknown"
-    
+
     # Get user identifier if authenticated
     user_id = None
     user_role = None
-    if hasattr(request.state, 'user'):
+    if hasattr(request.state, "user"):
         user_id = request.state.user.get("sub")
         user_role = request.state.user.get("role")
-    
+
     # Use user ID if available, otherwise IP
     identifier = user_id or client_ip
-    
+
     # Get rate limit configuration
     limit_config = RateLimitConfig.get_limit(service_name, user_role)
-    
+
     # Check rate limit
     allowed, info = await rate_limiter.check_rate_limit(
         identifier=identifier,
         endpoint=service_name,
         max_requests=limit_config["max_requests"],
         window_seconds=limit_config["window_seconds"],
-        strategy=settings.RATE_LIMIT_STRATEGY
+        strategy=settings.RATE_LIMIT_STRATEGY,
     )
-    
+
     if not allowed:
         logger.warning(
             f"Rate limit exceeded: identifier={identifier}, "
@@ -322,16 +378,20 @@ async def check_rate_limit(request: Request, service_name: str):
                 "X-RateLimit-Limit": str(limit_config["max_requests"]),
                 "X-RateLimit-Remaining": str(info.get("remaining", 0)),
                 "X-RateLimit-Reset": str(info.get("reset", 0)),
-                "Retry-After": str(limit_config["window_seconds"])
-            }
+                "Retry-After": str(limit_config["window_seconds"]),
+            },
         )
-    
+
     # Add rate limit headers to response
     request.state.rate_limit_info = info
 
     # Extra endpoint-level guard to reduce abuse on hot paths.
     endpoint_key = f"{service_name}:{request.method}:{request.url.path}"
-    endpoint_limit = max(5, int(limit_config["max_requests"] * 0.5)) if request.method in WRITE_METHODS else limit_config["max_requests"]
+    endpoint_limit = (
+        max(5, int(limit_config["max_requests"] * 0.5))
+        if request.method in WRITE_METHODS
+        else limit_config["max_requests"]
+    )
     endpoint_allowed, endpoint_info = await rate_limiter.check_rate_limit(
         identifier=identifier,
         endpoint=endpoint_key,
@@ -358,11 +418,7 @@ async def check_rate_limit(request: Request, service_name: str):
 @app.get("/")
 async def root():
     """Health check endpoint"""
-    return {
-        "service": "API Gateway",
-        "status": "healthy",
-        "version": "1.0.0"
-    }
+    return {"service": "API Gateway", "status": "healthy", "version": "1.0.0"}
 
 
 @app.get("/kpi/summary")
@@ -376,6 +432,32 @@ async def kpi_summary():
 async def kpi_cache_stats():
     """Response cache statistics for performance tuning."""
     return response_cache.stats()
+
+
+@app.post("/kpi/feature-usage")
+async def kpi_feature_usage(payload: Dict[str, Any]):
+    """Record feature adoption hit from the web UI."""
+    feature = str(payload.get("feature") or "").strip()
+    if not feature or len(feature) > 128:
+        raise HTTPException(status_code=400, detail="Invalid feature name")
+    if contains_suspicious_content(feature):
+        raise HTTPException(status_code=400, detail="Request contains blocked input patterns")
+    record_feature_usage(feature)
+    return {"recorded": True, "feature": feature}
+
+
+@app.post("/kpi/cache/invalidate")
+async def kpi_cache_invalidate(payload: Optional[Dict[str, Any]] = Body(default=None)):
+    """Invalidate response cache entries (optional prefix) for ops/tuning."""
+    prefix = ""
+    if payload and isinstance(payload, dict):
+        prefix = str(payload.get("prefix") or "")
+    if prefix:
+        removed = response_cache.invalidate_prefix(prefix)
+    else:
+        response_cache.clear()
+        removed = -1
+    return {"invalidated": True, "removed": removed, "stats": response_cache.stats()}
 
 
 @app.get("/health")
@@ -399,7 +481,9 @@ async def get_threat_status():
     return {
         "zero_trust_enforced": settings.ZERO_TRUST_ENFORCED,
         "zero_trust_networks": [
-            n.strip() for n in (settings.ZERO_TRUST_ALLOWED_NETWORKS or "").split(",") if n.strip()
+            n.strip()
+            for n in (settings.ZERO_TRUST_ALLOWED_NETWORKS or "").split(",")
+            if n.strip()
         ],
         "threat_block_threshold": settings.THREAT_BLOCK_THRESHOLD,
         "api_security_hardening": settings.API_SECURITY_ENABLE_INPUT_HARDENING,
@@ -466,14 +550,18 @@ async def _fetch_realtime_snapshot() -> Dict[str, Any]:
         timeout = httpx.Timeout(5.0, connect=2.0)
         client = httpx.AsyncClient(timeout=timeout)
     try:
-        sensor_res = await client.get(f"{SERVICES['data-ingestion']}/sensor-data", params={"limit": 20})
+        sensor_res = await client.get(
+            f"{SERVICES['data-ingestion']}/sensor-data", params={"limit": 20}
+        )
         if sensor_res.is_success:
             sensor_records = sensor_res.json().get("records", [])
     except Exception as exc:
         logger.debug("Realtime sensor fetch failed: %s", exc)
 
     try:
-        alert_res = await client.get(f"{SERVICES['alert']}/alerts", params={"status": "open"})
+        alert_res = await client.get(
+            f"{SERVICES['alert']}/alerts", params={"status": "open"}
+        )
         if alert_res.is_success:
             open_alerts = alert_res.json()
     except Exception as exc:
@@ -490,10 +578,7 @@ async def _fetch_realtime_snapshot() -> Dict[str, Any]:
 
 
 @app.websocket("/stream/realtime/ws")
-async def realtime_websocket(
-    websocket: WebSocket,
-    token: str = Query(default="")
-):
+async def realtime_websocket(websocket: WebSocket, token: str = Query(default="")):
     """Low-latency realtime stream over WebSocket."""
     if not token:
         await websocket.close(code=1008, reason="Missing token")
@@ -632,7 +717,9 @@ async def shutdown_gateway():
         upstream_client = None
 
 
-@app.api_route("/api/{service_name}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+@app.api_route(
+    "/api/{service_name}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"]
+)
 async def proxy_request(
     service_name: str,
     path: str,
@@ -645,19 +732,23 @@ async def proxy_request(
 
     await check_rate_limit(request, service_name)
     await enforce_zero_trust(request, service_name)
-    
+
     # Determine protocol (https if mTLS enabled, otherwise http)
-    protocol = "https" if (settings.MTLS_ENABLED and mtls_manager.mtls_enabled) else "http"
+    protocol = (
+        "https" if (settings.MTLS_ENABLED and mtls_manager.mtls_enabled) else "http"
+    )
     base_url = SERVICES[service_name].replace("http://", "").replace("https://", "")
     service_url = f"{protocol}://{base_url}"
     target_url = f"{service_url}/{path}"
-    
+
     required_roles = SERVICE_ROLE_REQUIREMENTS.get(service_name)
     if required_roles:
         payload = request.state.user
         role = payload.get("role")
         if not role:
-            raise HTTPException(status_code=401, detail="Token missing role information")
+            raise HTTPException(
+                status_code=401, detail="Token missing role information"
+            )
         if role not in required_roles:
             logger.warning(
                 "Forbidden: user=%s role=%s service=%s path=%s",
@@ -667,7 +758,7 @@ async def proxy_request(
                 path,
             )
             raise HTTPException(status_code=403, detail="Not enough permissions")
-    
+
     # Forward query parameters
     params = dict(request.query_params)
 
@@ -677,9 +768,15 @@ async def proxy_request(
     headers = _sanitize_forward_headers(dict(request.headers))
 
     full_path = f"/api/{service_name}/{path}"
-    user_sub = (request.state.user or {}).get("sub", "") if hasattr(request.state, "user") else ""
+    user_sub = (
+        (request.state.user or {}).get("sub", "")
+        if hasattr(request.state, "user")
+        else ""
+    )
     cache_key = None
-    if request.method == "GET" and any(full_path.startswith(p) for p in CACHEABLE_GET_PREFIXES):
+    if request.method == "GET" and any(
+        full_path.startswith(p) for p in CACHEABLE_GET_PREFIXES
+    ):
         query_str = str(request.url.query or "")
         cache_key = response_cache.build_key("GET", full_path, query_str, user_sub)
         cached = response_cache.get(cache_key)
@@ -692,7 +789,7 @@ async def proxy_request(
             )
 
     started = time.perf_counter()
-    
+
     # Get mTLS configuration if enabled; fallback to one-shot client for that path.
     use_dedicated_mtls_client = settings.MTLS_ENABLED and mtls_manager.mtls_enabled
 
@@ -713,7 +810,9 @@ async def proxy_request(
         else:
             client = upstream_client
             if client is None:
-                raise HTTPException(status_code=503, detail="Gateway upstream client unavailable")
+                raise HTTPException(
+                    status_code=503, detail="Gateway upstream client unavailable"
+                )
             response = await client.request(
                 method=request.method,
                 url=target_url,
@@ -728,14 +827,18 @@ async def proxy_request(
     except httpx.RequestError as e:
         logger.error("Error proxying to %s: %s", service_name, e)
         record_uptime_check(False)
-        raise HTTPException(status_code=502, detail=f"Service {service_name} unavailable")
+        raise HTTPException(
+            status_code=502, detail=f"Service {service_name} unavailable"
+        )
 
     record_latency(service_name, time.perf_counter() - started)
     record_uptime_check(response.is_success)
 
     risk_score, reasons = threat_detector.evaluate(
         ip=_client_ip(request),
-        user=(request.state.user or {}).get("sub") if hasattr(request.state, "user") else None,
+        user=(request.state.user or {}).get("sub")
+        if hasattr(request.state, "user")
+        else None,
         path=request.url.path,
         method=request.method,
         status_code=response.status_code,
@@ -754,7 +857,9 @@ async def proxy_request(
                 "reasons": reasons,
             },
         )
-        raise HTTPException(status_code=403, detail="Request blocked by threat detection policy")
+        raise HTTPException(
+            status_code=403, detail="Request blocked by threat detection policy"
+        )
     elif risk_score >= 40:
         siem_logger.emit(
             "threat_detected_warning",
@@ -781,28 +886,38 @@ async def proxy_request(
         response_body = response.text
 
     if response.is_error:
-        detail = response_body if isinstance(response_body, (dict, list)) else {"message": response_body}
+        detail = (
+            response_body
+            if isinstance(response_body, (dict, list))
+            else {"message": response_body}
+        )
         raise HTTPException(status_code=response.status_code, detail=detail)
 
     # Add rate limit headers to response
     response_headers = {}
-    if hasattr(request.state, 'rate_limit_info'):
+    if hasattr(request.state, "rate_limit_info"):
         info = request.state.rate_limit_info
-        response_headers.update({
-            "X-RateLimit-Limit": str(info.get("limit", 0)),
-            "X-RateLimit-Remaining": str(info.get("remaining", 0)),
-            "X-RateLimit-Reset": str(info.get("reset", 0)),
-            "X-Threat-Risk-Score": str(risk_score),
-        })
+        response_headers.update(
+            {
+                "X-RateLimit-Limit": str(info.get("limit", 0)),
+                "X-RateLimit-Remaining": str(info.get("remaining", 0)),
+                "X-RateLimit-Reset": str(info.get("reset", 0)),
+                "X-Threat-Risk-Score": str(risk_score),
+            }
+        )
     if hasattr(request.state, "endpoint_rate_limit_info"):
         endpoint_info = request.state.endpoint_rate_limit_info
-        response_headers.update({
-            "X-Endpoint-RateLimit-Limit": str(endpoint_info.get("limit", 0)),
-            "X-Endpoint-RateLimit-Remaining": str(endpoint_info.get("remaining", 0)),
-            "X-Endpoint-RateLimit-Reset": str(endpoint_info.get("reset", 0)),
-        })
+        response_headers.update(
+            {
+                "X-Endpoint-RateLimit-Limit": str(endpoint_info.get("limit", 0)),
+                "X-Endpoint-RateLimit-Remaining": str(
+                    endpoint_info.get("remaining", 0)
+                ),
+                "X-Endpoint-RateLimit-Reset": str(endpoint_info.get("reset", 0)),
+            }
+        )
     response_headers.update(_build_security_headers())
-    
+
     if isinstance(response_body, (dict, list)):
         if cache_key and response.is_success:
             response_cache.set(cache_key, response_body)
@@ -810,17 +925,16 @@ async def proxy_request(
         return JSONResponse(
             status_code=response.status_code,
             content=response_body,
-            headers=response_headers
+            headers=response_headers,
         )
 
     return Response(
         content=response_body or "",
         status_code=response.status_code,
         media_type=content_type or "text/plain",
-        headers=response_headers
+        headers=response_headers,
     )
 
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

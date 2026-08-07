@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts'
+import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts'
 import './BlockchainAudit.css'
 
 interface AuditLog {

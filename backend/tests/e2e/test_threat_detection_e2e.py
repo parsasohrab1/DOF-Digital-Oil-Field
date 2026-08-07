@@ -1,7 +1,11 @@
 import json
 from pathlib import Path
 
-from shared.threat_detection import SIEMEventLogger, ThreatDetector, is_private_or_loopback
+from shared.threat_detection import (
+    SIEMEventLogger,
+    ThreatDetector,
+    is_private_or_loopback,
+)
 
 
 def test_threat_detector_scores_spiky_traffic_and_auth_failures():
@@ -74,4 +78,3 @@ def test_siem_logger_write_failure_and_ip_helpers(monkeypatch):
     )
     assert risk >= 30
     assert "suspicious_method_for_health" in reasons
-

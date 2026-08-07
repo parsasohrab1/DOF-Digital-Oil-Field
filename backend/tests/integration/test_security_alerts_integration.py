@@ -17,7 +17,9 @@ class FakeRedis:
 
 
 def _build_memory_alerts(threshold: int = 3) -> SecurityAlerts:
-    alerts = SecurityAlerts(redis_url="redis://invalid-host:6379/0", threshold=threshold)
+    alerts = SecurityAlerts(
+        redis_url="redis://invalid-host:6379/0", threshold=threshold
+    )
     alerts.redis_client = None
     alerts.memory_store = {}
     return alerts
@@ -70,4 +72,3 @@ def test_redis_mode_and_empty_username_path():
     assert alerts.redis_client.store["login-fail:redis-user"] == 2
     alerts.reset_user("redis-user")
     assert "login-fail:redis-user" not in alerts.redis_client.store
-

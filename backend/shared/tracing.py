@@ -22,8 +22,12 @@ logger = setup_logging("tracing")
 
 
 def _build_exporter() -> List[BatchSpanProcessor]:
-    endpoint = settings.OTEL_EXPORTER_OTLP_ENDPOINT or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
-    use_console = settings.OTEL_TRACING_CONSOLE or (os.getenv("OTEL_TRACING_CONSOLE", "false").lower() == "true")
+    endpoint = settings.OTEL_EXPORTER_OTLP_ENDPOINT or os.getenv(
+        "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"
+    )
+    use_console = settings.OTEL_TRACING_CONSOLE or (
+        os.getenv("OTEL_TRACING_CONSOLE", "false").lower() == "true"
+    )
 
     span_processors: List[BatchSpanProcessor] = []
     if endpoint:
@@ -87,4 +91,3 @@ def setup_tracing(
         service_name,
         endpoint or "console",
     )
-

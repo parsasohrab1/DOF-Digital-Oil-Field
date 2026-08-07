@@ -5,11 +5,25 @@ import { reportingAPI } from '../api/services'
 import { getApiBaseUrl } from '../api/config'
 import './ReportBuilder.css'
 
-const DIMENSIONS = ['well_name', 'sensor_type', 'sensor_id', 'data_quality']
+const DIMENSIONS = ['well_name', 'sensor_type', 'sensor_id']
 const MEASURES = ['count', 'avg_value', 'min_value', 'max_value', 'sum_value']
 
+const DIM_LABEL_FA: Record<string, string> = {
+  well_name: 'نام چاه',
+  sensor_type: 'نوع سنسور',
+  sensor_id: 'شناسه سنسور',
+}
+
+const MEASURE_LABEL_FA: Record<string, string> = {
+  count: 'تعداد',
+  avg_value: 'میانگین',
+  min_value: 'حداقل',
+  max_value: 'حداکثر',
+  sum_value: 'مجموع',
+}
+
 export default function ReportBuilder() {
-  const [name, setName] = useState('Production Analytics')
+  const [name, setName] = useState('تحلیل تولید')
   const [wellName, setWellName] = useState('')
   const [selectedDims, setSelectedDims] = useState<string[]>(['well_name', 'sensor_type'])
   const [selectedMeasures, setSelectedMeasures] = useState<string[]>(['count', 'avg_value'])
@@ -42,6 +56,8 @@ export default function ReportBuilder() {
     setter(list.includes(item) ? list.filter((x) => x !== item) : [...list, item])
   }
 
+  const labelFor = (key: string) => DIM_LABEL_FA[key] || MEASURE_LABEL_FA[key] || key
+
   const exportCsv = () => {
     if (!result?.rows?.length) return
     const headers = [...selectedDims, ...selectedMeasures]
@@ -66,48 +82,48 @@ export default function ReportBuilder() {
   const apiBase = getApiBaseUrl()
 
   return (
-    <div className="rb-page">
-      <h2>Advanced Analytics / Report Builder</h2>
+    <div className="rb-page" dir="rtl">
+      <h2>گزارش‌ساز / تحلیل پیشرفته</h2>
 
       <div className="rb-grid">
         <section className="rb-panel">
-          <h3>Configure Report</h3>
-          <label>Report Name</label>
+          <h3>پیکربندی گزارش</h3>
+          <label>نام گزارش</label>
           <input value={name} onChange={(e) => setName(e.target.value)} />
 
-          <label>Well (optional)</label>
-          <input value={wellName} onChange={(e) => setWellName(e.target.value)} placeholder="PROD-001" />
+          <label>چاه (اختیاری)</label>
+          <input value={wellName} onChange={(e) => setWellName(e.target.value)} placeholder="DEH-01" />
 
-          <label>Dimensions</label>
+          <label>ابعاد</label>
           <div className="rb-chips">
             {DIMENSIONS.map((d) => (
               <button key={d} className={selectedDims.includes(d) ? 'active' : ''} onClick={() => toggle(selectedDims, d, setSelectedDims)}>
-                {d}
+                {DIM_LABEL_FA[d] || d}
               </button>
             ))}
           </div>
 
-          <label>Measures</label>
+          <label>معیارها</label>
           <div className="rb-chips">
             {MEASURES.map((m) => (
               <button key={m} className={selectedMeasures.includes(m) ? 'active' : ''} onClick={() => toggle(selectedMeasures, m, setSelectedMeasures)}>
-                {m}
+                {MEASURE_LABEL_FA[m] || m}
               </button>
             ))}
           </div>
 
           <button className="rb-run" onClick={() => buildMutation.mutate()} disabled={buildMutation.isPending || !selectedDims.length || !selectedMeasures.length}>
-            {buildMutation.isPending ? 'Building...' : 'Run Report'}
+            {buildMutation.isPending ? 'در حال ساخت…' : 'اجرای گزارش'}
           </button>
         </section>
 
         <section className="rb-panel">
-          <h3>Preview</h3>
+          <h3>پیش‌نمایش</h3>
           {!result ? (
-            <p className="rb-muted">Run a report to see results.</p>
+            <p className="rb-muted">برای مشاهده نتیجه، گزارش را اجرا کنید.</p>
           ) : (
             <>
-              <div className="rb-meta">Rows: {result.count} | ID: {result.report_id}</div>
+              <div className="rb-meta">ردیف‌ها: {result.count} | شناسه: {result.report_id}</div>
               {chartData.length > 0 && (
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={chartData}>
@@ -123,7 +139,7 @@ export default function ReportBuilder() {
                 <table>
                   <thead>
                     <tr>
-                      {[...selectedDims, ...selectedMeasures].map((h) => <th key={h}>{h}</th>)}
+                      {[...selectedDims, ...selectedMeasures].map((h) => <th key={h}>{labelFor(h)}</th>)}
                     </tr>
                   </thead>
                   <tbody>
@@ -135,30 +151,30 @@ export default function ReportBuilder() {
                   </tbody>
                 </table>
               </div>
-              <button className="rb-export" onClick={exportCsv}>Export CSV</button>
+              <button className="rb-export" onClick={exportCsv}>خروجی پرونده جدولی</button>
             </>
           )}
         </section>
       </div>
 
       <section className="rb-panel full">
-        <h3>Power BI / Tableau Integration</h3>
+        <h3>یکپارچه‌سازی Power BI / Tableau</h3>
         <div className="rb-connectors">
           <div className="rb-connector-card">
             <strong>Power BI</strong>
-            <p>REST endpoint: <code>{biConnectors?.power_bi?.base_url || `${apiBase}/api/reporting/bi/query`}</code></p>
-            <p>Metadata: <code>{biConnectors?.power_bi?.metadata_url || `${apiBase}/api/reporting/bi/metadata`}</code></p>
+            <p>نقطه پایانی REST: <code>{biConnectors?.power_bi?.base_url || `${apiBase}/api/reporting/bi/query`}</code></p>
+            <p>فراداده: <code>{biConnectors?.power_bi?.metadata_url || `${apiBase}/api/reporting/bi/metadata`}</code></p>
             <p>{biConnectors?.power_bi?.notes}</p>
           </div>
           <div className="rb-connector-card">
             <strong>Tableau</strong>
-            <p>REST endpoint: <code>{biConnectors?.tableau?.base_url || `${apiBase}/api/reporting/bi/query`}</code></p>
-            <p>Metadata: <code>{biConnectors?.tableau?.metadata_url || `${apiBase}/api/reporting/bi/metadata`}</code></p>
+            <p>نقطه پایانی REST: <code>{biConnectors?.tableau?.base_url || `${apiBase}/api/reporting/bi/query`}</code></p>
+            <p>فراداده: <code>{biConnectors?.tableau?.metadata_url || `${apiBase}/api/reporting/bi/metadata`}</code></p>
             <p>{biConnectors?.tableau?.notes}</p>
           </div>
         </div>
         <details>
-          <summary>BI Schema Metadata</summary>
+          <summary>فراداده طرح BI</summary>
           <pre>{JSON.stringify(biMetadata, null, 2)}</pre>
         </details>
       </section>

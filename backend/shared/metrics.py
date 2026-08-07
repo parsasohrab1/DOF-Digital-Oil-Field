@@ -59,8 +59,12 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             return response
         except Exception:
             status_code = 500
-            REQUEST_ERRORS.labels(self.service_name, request.method, str(status_code)).inc()
-            REQUEST_COUNT.labels(self.service_name, request.method, str(status_code)).inc()
+            REQUEST_ERRORS.labels(
+                self.service_name, request.method, str(status_code)
+            ).inc()
+            REQUEST_COUNT.labels(
+                self.service_name, request.method, str(status_code)
+            ).inc()
             raise
         finally:
             duration = time.perf_counter() - start
@@ -88,11 +92,15 @@ def setup_metrics(app: FastAPI, service_name: str):
     Attach Prometheus middleware and /metrics endpoint to the app.
     """
     if not METRICS_ENABLED:
-        logger.warning("prometheus-client not installed; metrics disabled for %s", service_name)
+        logger.warning(
+            "prometheus-client not installed; metrics disabled for %s", service_name
+        )
 
         @app.get("/metrics")
         async def metrics_unavailable():
-            raise HTTPException(status_code=503, detail="Prometheus client not available")
+            raise HTTPException(
+                status_code=503, detail="Prometheus client not available"
+            )
 
         return
 
@@ -104,4 +112,3 @@ def setup_metrics(app: FastAPI, service_name: str):
             return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     app.add_middleware(MetricsMiddleware, service_name=service_name)
-

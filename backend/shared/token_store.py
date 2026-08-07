@@ -78,4 +78,3 @@ class RefreshTokenStore:
 
 
 refresh_token_store = RefreshTokenStore()
-

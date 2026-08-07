@@ -1,10 +1,18 @@
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera, Text, Html, Environment } from '@react-three/drei'
 import * as THREE from 'three'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { well3DAPI, digitalTwinAPI } from '../api/services'
-import ErrorState from '../components/ErrorState'
+import {
+  FIELD,
+  DEHLORAN_WELLS,
+  STATUS_COLOR,
+  STATUS_LABEL_FA,
+  getDehloranLiveState,
+  buildDehloranWell3DData,
+  buildAllDehloranWells3D,
+} from '../data/dehloranField'
 import './Well3D.css'
 
 interface DepthData {
@@ -75,6 +83,36 @@ interface Well3DData {
   bop?: BOPData
   casings?: CasingData[]
   wellheadEquipment?: WellheadEquipment
+}
+
+function valveStatusFa(s: string) {
+  if (s === 'open') return 'باز'
+  if (s === 'closed') return 'بسته'
+  if (s === 'maintenance') return 'در تعمیر'
+  return s
+}
+
+function depthStatusFa(s: string) {
+  if (s === 'normal') return 'نرمال'
+  if (s === 'warning') return 'هشدار'
+  if (s === 'critical') return 'بحرانی'
+  return s
+}
+
+function casingTypeFa(t: string) {
+  if (t === 'conductor') return 'هادی'
+  if (t === 'surface') return 'سطحی'
+  if (t === 'intermediate') return 'میانی'
+  if (t === 'production') return 'تولیدی'
+  return t
+}
+
+function riskLevelFa(s: string) {
+  if (s === 'elevated') return 'بالا'
+  if (s === 'normal') return 'عادی'
+  if (s === 'high') return 'بالا'
+  if (s === 'critical') return 'بحرانی'
+  return s
 }
 
 // Wellhead Equipment Component - تجهیزات سر چاهی
@@ -228,12 +266,12 @@ function WellheadEquipment({ equipment, wellName }: { equipment?: WellheadEquipm
 
         {hovered === 'christmasTree' && (
           <Html distanceFactor={10}>
-            <div className="sensor-tooltip">
-              <h4>Christmas Tree - {wellName}</h4>
-              <p>Master Valve: {defaultEquipment.masterValve.status} ({defaultEquipment.masterValve.position}%)</p>
-              <p>Wing Valve: {defaultEquipment.wingValve.status} ({defaultEquipment.wingValve.position}%)</p>
-              <p>Choke Valve: {defaultEquipment.chokeValve.status} ({defaultEquipment.chokeValve.position}%)</p>
-              <p>Flow Rate: {defaultEquipment.flowMeter.flowRate} {defaultEquipment.flowMeter.unit}</p>
+            <div className="sensor-tooltip" dir="rtl">
+              <h4>درخت کریسمس — {wellName}</h4>
+              <p>شیر اصلی: {valveStatusFa(defaultEquipment.masterValve.status)} ({defaultEquipment.masterValve.position}%)</p>
+              <p>شیر بال: {valveStatusFa(defaultEquipment.wingValve.status)} ({defaultEquipment.wingValve.position}%)</p>
+              <p>شیر کنترل جریان: {valveStatusFa(defaultEquipment.chokeValve.status)} ({defaultEquipment.chokeValve.position}%)</p>
+              <p>دبی: {defaultEquipment.flowMeter.flowRate} {defaultEquipment.flowMeter.unit}</p>
             </div>
           </Html>
         )}
@@ -247,7 +285,7 @@ function BOP({ bopData }: { bopData?: BOPData }) {
   const [hovered, setHovered] = useState(false)
   
   const defaultBOP: BOPData = bopData || {
-    type: 'Annular BOP',
+    type: 'جلوگیری‌کننده حلقوی از فوران',
     pressureRating: 10000,
     stackHeight: 3.5,
     status: 'open'
@@ -313,12 +351,12 @@ function BOP({ bopData }: { bopData?: BOPData }) {
 
       {hovered && (
         <Html distanceFactor={10}>
-          <div className="sensor-tooltip">
-            <h4>BOP - Blow Out Preventer</h4>
-            <p>Type: {defaultBOP.type}</p>
-            <p>Pressure Rating: {defaultBOP.pressureRating.toLocaleString()} psi</p>
-            <p>Stack Height: {defaultBOP.stackHeight.toFixed(1)} m</p>
-            <p>Status: {defaultBOP.status.toUpperCase()}</p>
+          <div className="sensor-tooltip" dir="rtl">
+            <h4>جلوگیری‌کننده از فوران</h4>
+            <p>نوع: {defaultBOP.type}</p>
+            <p>رتبه فشار: {defaultBOP.pressureRating.toLocaleString()} psi</p>
+            <p>ارتفاع مجموعه: {defaultBOP.stackHeight.toFixed(1)} m</p>
+            <p>وضعیت: {valveStatusFa(defaultBOP.status)}</p>
           </div>
         </Html>
       )}
@@ -415,13 +453,13 @@ function Casing({ casing }: { casing: CasingData }) {
 
       {hovered && (
         <Html distanceFactor={10}>
-          <div className="sensor-tooltip">
-            <h4>Casing: {casing.type.toUpperCase()}</h4>
-            <p>Depth: 0 - {casing.depth.toFixed(1)} m</p>
-            <p>Outer Diameter: {casing.outerDiameter}" ({casing.outerDiameter * 25.4}mm)</p>
-            <p>Inner Diameter: {casing.innerDiameter}" ({casing.innerDiameter * 25.4}mm)</p>
-            <p>Cement Thickness: {casing.cementThickness}" ({casing.cementThickness * 25.4}mm)</p>
-            <p>Wall Thickness: {((casing.outerDiameter - casing.innerDiameter) / 2).toFixed(2)}"</p>
+          <div className="sensor-tooltip" dir="rtl">
+            <h4>غلاف: {casingTypeFa(casing.type)}</h4>
+            <p>عمق: ۰ – {casing.depth.toFixed(1)} m</p>
+            <p>قطر خارجی: {casing.outerDiameter}" ({casing.outerDiameter * 25.4}mm)</p>
+            <p>قطر داخلی: {casing.innerDiameter}" ({casing.innerDiameter * 25.4}mm)</p>
+            <p>ضخامت سیمان: {casing.cementThickness}" ({casing.cementThickness * 25.4}mm)</p>
+            <p>ضخامت دیواره: {((casing.outerDiameter - casing.innerDiameter) / 2).toFixed(2)}"</p>
           </div>
         </Html>
       )}
@@ -543,13 +581,13 @@ function SensorPoint({
       </mesh>
       {hovered && (
         <Html distanceFactor={10}>
-          <div className="sensor-tooltip">
+          <div className="sensor-tooltip" dir="rtl">
             <h4>{label}</h4>
-            <p>Depth: {depth.toFixed(1)} m</p>
-            <p>Pressure: {data.pressure.toFixed(2)} psi</p>
-            <p>Temperature: {data.temperature.toFixed(1)} °C</p>
-            <p>Flow Rate: {data.flowRate.toFixed(2)} bbl/day</p>
-            <p>Status: {data.status}</p>
+            <p>عمق: {depth.toFixed(1)} m</p>
+            <p>فشار: {data.pressure.toFixed(2)} psi</p>
+            <p>دما: {data.temperature.toFixed(1)} °C</p>
+            <p>دبی: {data.flowRate.toFixed(2)} bbl/day</p>
+            <p>وضعیت: {depthStatusFa(data.status)}</p>
           </div>
         </Html>
       )}
@@ -583,18 +621,18 @@ function DepthLabels({ depth, segments }: { depth: number; segments: number }) {
 // Multiple Wells Scene - نمایش چند چاه
 function MultipleWellsScene({ wellsData, wells }: { wellsData: Record<string, Well3DData | null>; wells: string[] }) {
   const controlsRef = useRef<any>(null)
-  const spacing = 15 // فاصله بین چاه‌ها
+  const spacing = 12 // فاصله بین چاه‌های دهلران (۴×۴)
 
   return (
     <>
-      <PerspectiveCamera makeDefault position={[30, 20, 30]} fov={50} />
+      <PerspectiveCamera makeDefault position={[40, 28, 40]} fov={50} />
       <OrbitControls
         ref={controlsRef}
         enablePan={true}
         enableZoom={true}
         enableRotate={true}
         minDistance={10}
-        maxDistance={100}
+        maxDistance={120}
       />
 
       {/* Lighting */}
@@ -602,20 +640,20 @@ function MultipleWellsScene({ wellsData, wells }: { wellsData: Record<string, We
       <directionalLight position={[10, 10, 5]} intensity={1} />
       <pointLight position={[-10, 10, -10]} intensity={0.5} />
 
-      {/* Ground plane - بزرگتر برای چند چاه */}
+      {/* Ground plane - میدان دهلران */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.1, 0]}>
-        <planeGeometry args={[100, 100]} />
+        <planeGeometry args={[120, 120]} />
         <meshStandardMaterial color="#3a5f3a" />
       </mesh>
 
-      {/* Render all wells */}
+      {/* Render all wells — شبکه ۴×۴ */}
       {wells.map((wellName, index) => {
         const wellData = wellsData[wellName]
 
-        const row = Math.floor(index / 2)
-        const col = index % 2
-        const x = (col - 0.5) * spacing
-        const z = (row - 0.5) * spacing
+        const row = Math.floor(index / 4)
+        const col = index % 4
+        const x = (col - 1.5) * spacing
+        const z = (row - 1.5) * spacing
 
         if (!wellData) {
           return (
@@ -632,7 +670,6 @@ function MultipleWellsScene({ wellsData, wells }: { wellsData: Record<string, We
 
         return (
           <group key={wellName} position={[x, 0, z]}>
-            {/* Well Label */}
             <Text
               position={[0, 5, 0]}
               fontSize={0.5}
@@ -642,14 +679,12 @@ function MultipleWellsScene({ wellsData, wells }: { wellsData: Record<string, We
             >
               {wellName}
             </Text>
-
-            {/* BOP */}
             <BOP bopData={wellData.bop} />
-
-            {/* Wellbore */}
-            <Wellbore depth={wellData.totalDepth} data={wellData.depthData} casings={wellData.casings} />
-
-            {/* Wellhead Equipment */}
+            <Wellbore
+              depth={Math.min(wellData.totalDepth, 900)}
+              data={wellData.depthData.slice(0, 14)}
+              casings={wellData.casings}
+            />
             <WellheadEquipment equipment={wellData.wellheadEquipment} wellName={wellName} />
           </group>
         )
@@ -661,7 +696,7 @@ function MultipleWellsScene({ wellsData, wells }: { wellsData: Record<string, We
 }
 
 // Main 3D Scene - Single Well
-function WellScene({ data }: { data: Well3DData }) {
+function WellScene({ data, autoRotate = false }: { data: Well3DData; autoRotate?: boolean }) {
   const controlsRef = useRef<any>(null)
 
   // Calculate sensor positions at different depths
@@ -690,6 +725,8 @@ function WellScene({ data }: { data: Well3DData }) {
         enableRotate={true}
         minDistance={3}
         maxDistance={20}
+        autoRotate={autoRotate}
+        autoRotateSpeed={0.6}
       />
 
       {/* Lighting */}
@@ -729,17 +766,17 @@ function WellScene({ data }: { data: Well3DData }) {
       {/* Surface data display */}
       <Html position={[2, 2, 0]} distanceFactor={5}>
         <div className="surface-data-panel">
-          <h3>Surface Data</h3>
+          <h3>{data.wellName} — داده‌های سطحی</h3>
           <div className="data-row">
-            <span>Wellhead Pressure:</span>
+            <span>فشار سرچاهی:</span>
             <span>{data.surfaceData.wellheadPressure.toFixed(2)} psi</span>
           </div>
           <div className="data-row">
-            <span>Wellhead Temperature:</span>
+            <span>دمای سرچاهی:</span>
             <span>{data.surfaceData.wellheadTemperature.toFixed(1)} °C</span>
           </div>
           <div className="data-row">
-            <span>Flow Rate:</span>
+            <span>دبی / دبی‌سنج مجازی:</span>
             <span>{data.surfaceData.flowRate.toFixed(2)} bbl/day</span>
           </div>
         </div>
@@ -752,12 +789,22 @@ function WellScene({ data }: { data: Well3DData }) {
 }
 
 export default function Well3D() {
-  const [selectedWell, setSelectedWell] = useState<string>('PROD-001')
+  const [selectedWell, setSelectedWell] = useState<string>(DEHLORAN_WELLS[0].id)
   const [autoRotate, setAutoRotate] = useState(false)
   const [viewMode, setViewMode] = useState<'single' | 'multiple'>('single')
   const [chokePct, setChokePct] = useState(0)
   const [pumpSpeedPct, setPumpSpeedPct] = useState(0)
   const [whatIfResult, setWhatIfResult] = useState<any>(null)
+  const [tick, setTick] = useState(Date.now())
+
+  useEffect(() => {
+    const id = window.setInterval(() => setTick(Date.now()), 10000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const dehloranIds = useMemo(() => DEHLORAN_WELLS.map((w) => w.id), [])
+  const liveWells = useMemo(() => getDehloranLiveState(tick), [tick])
+  const liveSelected = liveWells.find((w) => w.id === selectedWell)
 
   const whatIfMutation = useMutation({
     mutationFn: (base: { flow_rate: number; pressure: number; temperature: number }) =>
@@ -768,18 +815,46 @@ export default function Well3D() {
         horizon_hours: 12,
       }),
     onSuccess: (data) => setWhatIfResult(data),
-  })
-
-  // Fetch list of wells from Wells page data
-  const { data: wellsResponse, isError: isWellsListError, refetch: refetchWellsList } = useQuery({
-    queryKey: ['wells-list-3d'],
-    queryFn: async () => {
-      const response = await well3DAPI.getWells()
-      return Array.isArray(response) ? response : response?.wells || []
+    onError: () => {
+      // Local Dehloran what-if when twin API unavailable
+      if (!displayDataRef.current) return
+      const base = displayDataRef.current.surfaceData
+      const flow =
+        base.flowRate * (1 + chokePct / 100) * (1 + pumpSpeedPct / 80)
+      const pressure = base.wellheadPressure * (1 - chokePct / 200) * (1 + pumpSpeedPct / 150)
+      setWhatIfResult({
+        projected: {
+          flow_rate: Math.round(flow),
+          pressure: Math.round(pressure),
+          temperature: base.wellheadTemperature,
+        },
+        risk_level:
+          flow > base.flowRate * 1.15 || pressure > base.wellheadPressure * 1.1
+            ? 'elevated'
+            : 'normal',
+        source: 'local-dehloran-model',
+      })
     },
   })
 
-  const wells: string[] = Array.isArray(wellsResponse) ? wellsResponse : []
+  const { data: wellsResponse } = useQuery({
+    queryKey: ['wells-list-3d-dehloran'],
+    queryFn: async () => {
+      try {
+        const response = await well3DAPI.getWells()
+        const list = Array.isArray(response) ? response : response?.wells || []
+        return list.length >= 8 ? list : dehloranIds
+      } catch {
+        return dehloranIds
+      }
+    },
+    initialData: dehloranIds,
+  })
+
+  const wells: string[] = useMemo(() => {
+    const list = Array.isArray(wellsResponse) ? wellsResponse : dehloranIds
+    return list.length > 0 ? list : dehloranIds
+  }, [wellsResponse, dehloranIds])
 
   useEffect(() => {
     if (wells.length > 0 && !wells.includes(selectedWell)) {
@@ -787,86 +862,95 @@ export default function Well3D() {
     }
   }, [wells, selectedWell])
 
-  // Fetch well data for selected well
-  const { data: wellData, isLoading, error, refetch: refetchWellData } = useQuery({
-    queryKey: ['well3d', selectedWell],
+  const { data: apiWellData, isLoading } = useQuery({
+    queryKey: ['well3d', selectedWell, tick],
     queryFn: () => well3DAPI.getWellData(selectedWell),
-    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchInterval: 15000,
     enabled: !!selectedWell,
+    retry: 0,
   })
 
-  // Fetch data for all wells (for multiple view)
+  const fallbackData = useMemo(
+    () => buildDehloranWell3DData(selectedWell, tick) as Well3DData,
+    [selectedWell, tick]
+  )
+
+  const displayData: Well3DData = useMemo(() => {
+    if (apiWellData && apiWellData.depthData?.length) {
+      return {
+        ...fallbackData,
+        ...apiWellData,
+        wellName: apiWellData.wellName || selectedWell,
+        surfaceData: apiWellData.surfaceData || fallbackData.surfaceData,
+        depthData: apiWellData.depthData,
+        bop: apiWellData.bop || fallbackData.bop,
+        casings: apiWellData.casings?.length ? apiWellData.casings : fallbackData.casings,
+        wellheadEquipment: apiWellData.wellheadEquipment || fallbackData.wellheadEquipment,
+        riskZones: apiWellData.riskZones?.length ? apiWellData.riskZones : fallbackData.riskZones,
+      }
+    }
+    return fallbackData
+  }, [apiWellData, fallbackData, selectedWell])
+
+  const displayDataRef = useRef(displayData)
+  displayDataRef.current = displayData
+
   const { data: allWellsData } = useQuery({
-    queryKey: ['wells3d-all', wells],
+    queryKey: ['wells3d-all-dehloran', wells, tick],
     queryFn: async () => {
-      const wellsData: Record<string, Well3DData | null> = {}
-      for (const wellName of wells) {
+      const local = buildAllDehloranWells3D(tick) as Record<string, Well3DData>
+      const wellsData: Record<string, Well3DData | null> = { ...local }
+      for (const wellName of wells.slice(0, 16)) {
         try {
-          wellsData[wellName] = (await well3DAPI.getWellData(wellName)) ?? null
-        } catch (error) {
-          wellsData[wellName] = null
+          const remote = await well3DAPI.getWellData(wellName)
+          if (remote?.depthData?.length) {
+            wellsData[wellName] = { ...local[wellName], ...remote }
+          }
+        } catch {
+          /* keep local Dehloran twin */
         }
       }
       return wellsData
     },
-    enabled: viewMode === 'multiple' && wells.length > 0,
+    enabled: viewMode === 'multiple',
+    initialData: buildAllDehloranWells3D(tick) as Record<string, Well3DData>,
   })
 
-  if (isWellsListError) {
-    return (
-      <div className="well3d-container">
-        <ErrorState message="Unable to load the wells list." onRetry={() => refetchWellsList()} />
-      </div>
-    )
-  }
-
-  if (isLoading && viewMode === 'single') {
-    return (
-      <div className="well3d-container">
-        <div className="loading">Loading 3D visualization...</div>
-      </div>
-    )
-  }
-
-  if ((error || !wellData) && viewMode === 'single') {
-    return (
-      <div className="well3d-container">
-        <ErrorState message={`Unable to load 3D data for ${selectedWell}.`} onRetry={() => refetchWellData()} />
-      </div>
-    )
-  }
-
-  const displayData: Well3DData | undefined = wellData
-
-  if (viewMode === 'single' && !displayData) {
-    return null
-  }
+  const wellLabel =
+    DEHLORAN_WELLS.find((w) => w.id === selectedWell)?.nameFa || selectedWell
 
   return (
-    <div className="well3d-container">
-      <div className="well3d-controls">
+    <div className="well3d-container" dir="rtl">
+      <div className="well3d-controls deh-3d-header">
+        <div className="deh-3d-brand">
+          <strong>{FIELD.nameFa}</strong>
+          <span>{FIELD.clientFa} · نفت سنگین درجه سنگینی {FIELD.apiGravity}°</span>
+        </div>
         <div className="control-group">
-          <label>View Mode:</label>
+          <label>حالت نمایش:</label>
           <select
             value={viewMode}
             onChange={(e) => setViewMode(e.target.value as 'single' | 'multiple')}
           >
-            <option value="single">Single Well</option>
-            <option value="multiple">All Wells</option>
+            <option value="single">تک‌چاه</option>
+            <option value="multiple">هر ۱۶ حلقه</option>
           </select>
         </div>
         {viewMode === 'single' && (
           <div className="control-group">
-            <label>Select Well:</label>
+            <label>انتخاب چاه:</label>
             <select
               value={selectedWell}
               onChange={(e) => setSelectedWell(e.target.value)}
             >
-              {wells.map((well) => (
-                <option key={well} value={well}>
-                  {well}
-                </option>
-              ))}
+              {wells.map((well) => {
+                const fa = DEHLORAN_WELLS.find((w) => w.id === well)?.nameFa
+                return (
+                  <option key={well} value={well}>
+                    {fa ? `${fa} (${well})` : well}
+                  </option>
+                )
+              })}
             </select>
           </div>
         )}
@@ -877,31 +961,61 @@ export default function Well3D() {
               checked={autoRotate}
               onChange={(e) => setAutoRotate(e.target.checked)}
             />
-            Auto Rotate
+            چرخش خودکار
           </label>
         </div>
         <div className="well-info">
-          {viewMode === 'single' && displayData ? (
+          {viewMode === 'single' ? (
             <>
-              <h2>{displayData.wellName}</h2>
-              <p>Total Depth: {displayData.totalDepth.toFixed(0)} m</p>
+              <h2>
+                {wellLabel}{' '}
+                {liveSelected && (
+                  <span
+                    className="deh-3d-status"
+                    style={{ color: STATUS_COLOR[liveSelected.status] }}
+                  >
+                    {STATUS_LABEL_FA[liveSelected.status]}
+                  </span>
+                )}
+              </h2>
+              <p>
+                عمق کل: {displayData.totalDepth.toFixed(0)} m · فشار سرچاهی:{' '}
+                {displayData.surfaceData.wellheadPressure} psi · دبی‌سنج مجازی:{' '}
+                {displayData.surfaceData.flowRate} bbl/d
+                {isLoading ? ' · به‌روزرسانی…' : ''}
+              </p>
             </>
           ) : (
             <>
-              <h2>All Wells ({wells.length})</h2>
-              <p>Total Wells: {wells.length}</p>
+              <h2>نمای سه‌بعدی میدان دهلران</h2>
+              <p>{FIELD.wellCount} حلقه چاه · دوقلوی دیجیتال</p>
             </>
           )}
         </div>
       </div>
 
+      {viewMode === 'single' && liveSelected && (
+        <div className="deh-3d-livebar">
+          <span>فشار سرچاهی: <b>{liveSelected.thp} psi</b></span>
+          <span>دما: <b>{liveSelected.tht} °C</b></span>
+          <span>نفت: <b>{liveSelected.oilRate} bbl/d</b></span>
+          <span>گاز: <b>{liveSelected.gasRate} Mscf/d</b></span>
+          <span>آب: <b>{liveSelected.waterRate} bbl/d</b></span>
+          <span>درصد آب تولیدی: <b>{liveSelected.waterCut}%</b></span>
+          <span>پمپ: <b>{liveSelected.pumpOnline ? 'آنلاین' : 'آفلاین'}</b></span>
+        </div>
+      )}
+
       <div className="well3d-viewport">
         <Canvas className="well3d-canvas" shadows>
           <Suspense fallback={null}>
-            {viewMode === 'single' && displayData ? (
-              <WellScene data={displayData} />
-            ) : viewMode === 'single' ? null : (
-              <MultipleWellsScene wellsData={allWellsData || {}} wells={wells} />
+            {viewMode === 'single' ? (
+              <WellScene data={displayData} autoRotate={autoRotate} />
+            ) : (
+              <MultipleWellsScene
+                wellsData={allWellsData || (buildAllDehloranWells3D(tick) as Record<string, Well3DData>)}
+                wells={wells.slice(0, 16)}
+              />
             )}
           </Suspense>
         </Canvas>
@@ -909,112 +1023,156 @@ export default function Well3D() {
 
       <div className="well3d-legend">
         <div className="legend-section">
-          <h3>Status Legend</h3>
+          <h3>وضعیت</h3>
           <div className="legend-item">
             <div className="legend-color normal"></div>
-            <span>Normal</span>
+            <span>نرمال</span>
           </div>
           <div className="legend-item">
             <div className="legend-color warning"></div>
-            <span>Warning</span>
+            <span>هشدار</span>
           </div>
           <div className="legend-item">
             <div className="legend-color critical"></div>
-            <span>Critical</span>
+            <span>بحرانی</span>
           </div>
         </div>
-        
-        {displayData && (
-          <>
-            {displayData.bop && (
-              <div className="legend-section">
-                <h3>BOP Status</h3>
-                <div className="legend-item">
-                  <div className="legend-color" style={{ background: displayData.bop.status === 'open' ? '#00ff00' : displayData.bop.status === 'closed' ? '#ff0000' : '#ffaa00' }}></div>
-                  <span>{displayData.bop.type} - {displayData.bop.status.toUpperCase()}</span>
-                </div>
-                <div className="legend-item">
-                  <span style={{ fontSize: '12px', opacity: 0.8 }}>Rating: {displayData.bop.pressureRating.toLocaleString()} psi</span>
-                </div>
-              </div>
-            )}
 
-            {displayData.casings && displayData.casings.length > 0 && (
-              <div className="legend-section">
-                <h3>Casing Types</h3>
-                {displayData.casings.map((casing, index) => {
-                  const getCasingColor = () => {
-                    switch (casing.type) {
-                      case 'conductor': return '#8b4513'
-                      case 'surface': return '#4169e1'
-                      case 'intermediate': return '#32cd32'
-                      case 'production': return '#ff6347'
-                      default: return '#808080'
-                    }
-                  }
-                  return (
-                    <div key={index} className="legend-item">
-                      <div className="legend-color" style={{ background: getCasingColor() }}></div>
-                      <span>{casing.type.toUpperCase()}: {casing.outerDiameter}" OD / {casing.innerDiameter}" ID (0-{casing.depth}m)</span>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+        {displayData.bop && (
+          <div className="legend-section">
+            <h3>جلوگیری‌کننده از فوران</h3>
+            <div className="legend-item">
+              <div
+                className="legend-color"
+                style={{
+                  background:
+                    displayData.bop.status === 'open'
+                      ? '#00ff00'
+                      : displayData.bop.status === 'closed'
+                        ? '#ff0000'
+                        : '#ffaa00',
+                }}
+              ></div>
+              <span>
+                {displayData.bop.type} — {valveStatusFa(displayData.bop.status)}
+              </span>
+            </div>
+            <div className="legend-item">
+              <span style={{ fontSize: '12px', opacity: 0.8 }}>
+                رتبه فشار: {displayData.bop.pressureRating.toLocaleString()} psi
+              </span>
+            </div>
+          </div>
+        )}
 
-            {displayData.riskZones && displayData.riskZones.length > 0 && (
-              <div className="legend-section">
-                <h3>Risk Zones</h3>
-                {displayData.riskZones.map((zone, idx) => (
-                  <div key={idx} className="legend-item">
-                    <div
-                      className="legend-color"
-                      style={{ background: zone.severity === 'critical' ? '#ff0000' : '#ffaa00' }}
-                    ></div>
-                    <span>
-                      {zone.name}: {zone.fromDepth}m - {zone.toDepth}m
-                    </span>
-                  </div>
-                ))}
+        {displayData.casings && displayData.casings.length > 0 && (
+          <div className="legend-section">
+            <h3>غلاف‌ها</h3>
+            {displayData.casings.map((casing, index) => {
+              const getCasingColor = () => {
+                switch (casing.type) {
+                  case 'conductor':
+                    return '#8b4513'
+                  case 'surface':
+                    return '#4169e1'
+                  case 'intermediate':
+                    return '#32cd32'
+                  case 'production':
+                    return '#ff6347'
+                  default:
+                    return '#808080'
+                }
+              }
+              return (
+                <div key={index} className="legend-item">
+                  <div className="legend-color" style={{ background: getCasingColor() }}></div>
+                  <span>
+                    {casingTypeFa(casing.type)}: {casing.outerDiameter}&quot; / {casing.innerDiameter}&quot; (۰–
+                    {casing.depth}m)
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {displayData.riskZones && displayData.riskZones.length > 0 && (
+          <div className="legend-section">
+            <h3>مناطق ریسک</h3>
+            {displayData.riskZones.map((zone, idx) => (
+              <div key={idx} className="legend-item">
+                <div
+                  className="legend-color"
+                  style={{ background: zone.severity === 'critical' ? '#ff0000' : '#ffaa00' }}
+                ></div>
+                <span>
+                  {zone.name}: {zone.fromDepth}m – {zone.toDepth}m
+                </span>
               </div>
-            )}
-          </>
+            ))}
+          </div>
         )}
       </div>
 
       {viewMode === 'single' && (
         <div className="well3d-whatif">
-          <h3>What-if Scenario Analysis</h3>
+          <h3>تحلیل چه-اگر — دوقلوی دیجیتال دهلران</h3>
           <div className="whatif-controls">
             <label>
-              Choke adjustment (%)
-              <input type="range" min={-20} max={20} value={chokePct} onChange={(e) => setChokePct(Number(e.target.value))} />
+              تنظیم شیر کنترل جریان (%)
+              <input
+                type="range"
+                min={-20}
+                max={20}
+                value={chokePct}
+                onChange={(e) => setChokePct(Number(e.target.value))}
+              />
               {chokePct}%
             </label>
             <label>
-              Pump speed adjustment (%)
-              <input type="range" min={-20} max={20} value={pumpSpeedPct} onChange={(e) => setPumpSpeedPct(Number(e.target.value))} />
+              سرعت پمپ (%)
+              <input
+                type="range"
+                min={-20}
+                max={20}
+                value={pumpSpeedPct}
+                onChange={(e) => setPumpSpeedPct(Number(e.target.value))}
+              />
               {pumpSpeedPct}%
             </label>
             <button
               onClick={() =>
-                displayData &&
                 whatIfMutation.mutate({
                   flow_rate: displayData.surfaceData.flowRate,
                   pressure: displayData.surfaceData.wellheadPressure,
                   temperature: displayData.surfaceData.wellheadTemperature,
                 })
               }
-              disabled={whatIfMutation.isPending || !displayData}
+              disabled={whatIfMutation.isPending}
             >
-              {whatIfMutation.isPending ? 'Simulating...' : 'Run Simulation'}
+              {whatIfMutation.isPending ? 'در حال شبیه‌سازی…' : 'اجرای شبیه‌سازی'}
             </button>
           </div>
           {whatIfResult && (
             <div className="whatif-results">
-              <p><strong>Projected flow:</strong> {whatIfResult.projected?.flow_rate?.toFixed?.(1) ?? whatIfResult.projected_flow_rate ?? '—'} bbl/d</p>
-              <p><strong>Projected pressure:</strong> {whatIfResult.projected?.pressure?.toFixed?.(1) ?? whatIfResult.projected_pressure ?? '—'} psi</p>
-              <p><strong>Risk level:</strong> {whatIfResult.risk_level ?? whatIfResult.risk ?? '—'}</p>
+              <p>
+                <strong>دبی پیش‌بینی:</strong>{' '}
+                {whatIfResult.projected?.flow_rate?.toFixed?.(1) ??
+                  whatIfResult.projected_flow_rate ??
+                  '—'}{' '}
+                bbl/d
+              </p>
+              <p>
+                <strong>فشار پیش‌بینی:</strong>{' '}
+                {whatIfResult.projected?.pressure?.toFixed?.(1) ??
+                  whatIfResult.projected_pressure ??
+                  '—'}{' '}
+                psi
+              </p>
+              <p>
+                <strong>سطح ریسک:</strong>{' '}
+                {riskLevelFa(String(whatIfResult.risk_level ?? whatIfResult.risk ?? '—'))}
+              </p>
             </div>
           )}
         </div>
@@ -1022,4 +1180,5 @@ export default function Well3D() {
     </div>
   )
 }
+
 

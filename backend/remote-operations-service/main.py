@@ -18,7 +18,7 @@ from pydantic import BaseModel
 import uvicorn
 
 # Add backend directory to path
-backend_dir = os.path.join(os.path.dirname(__file__), '..')
+backend_dir = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, backend_dir)
 
 from shared.config import settings
@@ -69,6 +69,7 @@ async def shutdown_event():
 
 class OperationType(str, Enum):
     """Remote operation types"""
+
     SETPOINT_ADJUSTMENT = "setpoint_adjustment"
     EQUIPMENT_START = "equipment_start"
     EQUIPMENT_STOP = "equipment_stop"
@@ -82,6 +83,7 @@ class OperationType(str, Enum):
 
 class SetpointRequest(BaseModel):
     """Setpoint adjustment request"""
+
     well_name: str
     equipment_id: str
     parameter_name: str  # pressure, temperature, flow_rate, etc.
@@ -91,6 +93,7 @@ class SetpointRequest(BaseModel):
 
 class EquipmentControlRequest(BaseModel):
     """Equipment start/stop request"""
+
     well_name: str
     equipment_id: str
     equipment_type: str  # pump, compressor, motor, etc.
@@ -99,6 +102,7 @@ class EquipmentControlRequest(BaseModel):
 
 class ValveControlRequest(BaseModel):
     """Valve control request"""
+
     well_name: str
     valve_id: str
     operation: str  # open, close, set_position
@@ -107,6 +111,7 @@ class ValveControlRequest(BaseModel):
 
 class EmergencyShutdownRequest(BaseModel):
     """Emergency shutdown request"""
+
     well_name: Optional[str] = None  # None for site-wide shutdown
     equipment_id: Optional[str] = None
     shutdown_type: str = "immediate"  # immediate, controlled, partial
@@ -115,16 +120,19 @@ class EmergencyShutdownRequest(BaseModel):
 
 class TwoFactorRequest(BaseModel):
     """2FA verification for a pending command"""
+
     two_fa_code: str
 
 
 class ApprovalRequest(BaseModel):
     """Simulation approval for a pending command"""
+
     approval_notes: Optional[str] = None
 
 
 class OperationResponse(BaseModel):
     """Operation response"""
+
     operation_id: str
     operation_type: str
     status: str  # pending, approved, executing, executed, rejected, failed
@@ -135,6 +143,7 @@ class OperationResponse(BaseModel):
 
 class OperationStatus(BaseModel):
     """Operation status"""
+
     operation_id: str
     status: str
     progress: float  # 0.0 to 1.0
@@ -162,7 +171,7 @@ def _workflow_result_or_400(result: Dict[str, Any]) -> Dict[str, Any]:
 async def adjust_setpoint(
     request: SetpointRequest,
     db: Session = Depends(get_db),
-    claims: Dict[str, Any] = Depends(require_operator)
+    claims: Dict[str, Any] = Depends(require_operator),
 ):
     """Request a setpoint adjustment. Always requires 2FA + simulation + approval."""
     user = _get_requesting_user(db, claims)
@@ -196,7 +205,7 @@ async def adjust_setpoint(
 async def control_equipment(
     request: EquipmentControlRequest,
     db: Session = Depends(get_db),
-    claims: Dict[str, Any] = Depends(require_operator)
+    claims: Dict[str, Any] = Depends(require_operator),
 ):
     """Request equipment start/stop. Always requires 2FA + simulation + approval."""
     user = _get_requesting_user(db, claims)
@@ -229,7 +238,7 @@ async def control_equipment(
 async def control_valve(
     request: ValveControlRequest,
     db: Session = Depends(get_db),
-    claims: Dict[str, Any] = Depends(require_operator)
+    claims: Dict[str, Any] = Depends(require_operator),
 ):
     """Request valve control. Always requires 2FA + simulation + approval."""
     user = _get_requesting_user(db, claims)
@@ -264,12 +273,14 @@ async def verify_two_factor(
     command_id: str,
     request: TwoFactorRequest,
     db: Session = Depends(get_db),
-    claims: Dict[str, Any] = Depends(require_operator)
+    claims: Dict[str, Any] = Depends(require_operator),
 ):
     """Verify the requester's 2FA code and automatically run the Digital Twin simulation."""
     user = _get_requesting_user(db, claims)
     try:
-        result = await secure_command_workflow.verify_two_factor(db, command_id, request.two_fa_code, user)
+        result = await secure_command_workflow.verify_two_factor(
+            db, command_id, request.two_fa_code, user
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return _workflow_result_or_400(result)
@@ -280,12 +291,14 @@ async def approve_operation(
     command_id: str,
     request: ApprovalRequest,
     db: Session = Depends(get_db),
-    claims: Dict[str, Any] = Depends(require_command_admin)
+    claims: Dict[str, Any] = Depends(require_command_admin),
 ):
     """Approve a simulated command. Enforces the two-person rule (cannot approve your own request)."""
     approver = _get_requesting_user(db, claims)
     try:
-        result = await secure_command_workflow.approve_simulation(db, command_id, approver, request.approval_notes)
+        result = await secure_command_workflow.approve_simulation(
+            db, command_id, approver, request.approval_notes
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return _workflow_result_or_400(result)
@@ -295,7 +308,7 @@ async def approve_operation(
 async def execute_operation(
     command_id: str,
     db: Session = Depends(get_db),
-    claims: Dict[str, Any] = Depends(require_command_admin)
+    claims: Dict[str, Any] = Depends(require_command_admin),
 ):
     """Execute an approved command by publishing it to Kafka for SCADA/PLC pickup."""
     executor = _get_requesting_user(db, claims)
@@ -310,7 +323,7 @@ async def execute_operation(
 async def emergency_shutdown(
     request: EmergencyShutdownRequest,
     db: Session = Depends(get_db),
-    claims: Dict[str, Any] = Depends(require_roles({"system_admin", "field_operator"}))
+    claims: Dict[str, Any] = Depends(require_roles({"system_admin", "field_operator"})),
 ):
     """
     Emergency shutdown procedure.
@@ -380,7 +393,7 @@ async def emergency_shutdown(
 async def get_operation_status(
     operation_id: str,
     db: Session = Depends(get_db),
-    _: Dict[str, Any] = Depends(require_operator)
+    _: Dict[str, Any] = Depends(require_operator),
 ):
     """Get status of a remote operation"""
     command = db.query(Command).filter(Command.command_id == operation_id).first()
@@ -404,7 +417,9 @@ async def get_operation_status(
         status=command.status,
         progress=progress,
         current_value=None,  # Would be fetched from equipment
-        target_value=command.parameters.get("target_value") if isinstance(command.parameters, dict) else None,
+        target_value=command.parameters.get("target_value")
+        if isinstance(command.parameters, dict)
+        else None,
         estimated_completion=None,
         error_message=None,
     )
@@ -413,10 +428,7 @@ async def get_operation_status(
 @app.get("/health")
 async def health():
     """Health check"""
-    return {
-        "status": "healthy",
-        "service": "remote-operations"
-    }
+    return {"status": "healthy", "service": "remote-operations"}
 
 
 if __name__ == "__main__":

@@ -95,6 +95,44 @@ export const alertAPI = {
     const response = await apiClient.post(`/api/alert/alerts/${alertId}/rca`, { lookback_minutes: lookbackMinutes })
     return response.data
   },
+
+  getSmsStatus: async () => {
+    const response = await apiClient.get('/api/alert/notifications/sms/status')
+    return response.data
+  },
+
+  registerSmsPhone: async (payload: {
+    phone: string
+    label?: string
+    enabled?: boolean
+    severities?: string[]
+  }) => {
+    const response = await apiClient.post('/api/alert/notifications/sms/register', payload)
+    return response.data
+  },
+
+  unregisterSmsPhone: async (phone: string) => {
+    const response = await apiClient.post('/api/alert/notifications/sms/unregister', { phone })
+    return response.data
+  },
+
+  sendTestSms: async (phone?: string, message?: string) => {
+    const response = await apiClient.post('/api/alert/notifications/sms/test', {
+      phone: phone || undefined,
+      message: message || undefined,
+    })
+    return response.data
+  },
+
+  getSmsOutbox: async (limit = 20) => {
+    const response = await apiClient.get('/api/alert/notifications/sms/outbox', { params: { limit } })
+    return response.data
+  },
+
+  sendAlertSms: async (alertId: string) => {
+    const response = await apiClient.post(`/api/alert/alerts/${alertId}/sms`)
+    return response.data
+  },
 }
 
 // Tag Catalog API
@@ -160,18 +198,6 @@ export const reportingAPI = {
   
   getReport: async (reportId: string) => {
     const response = await apiClient.get(`/api/reporting/reports/${reportId}`)
-    return response.data
-  },
-  generateDataQualityLineage: async (request?: { well_name?: string; lookback_hours?: number }) => {
-    const response = await apiClient.post('/api/reporting/reports/data-quality-lineage', request || {})
-    return response.data
-  },
-  generateAutoDataQualityLineage: async (request?: { well_name?: string; lookback_hours?: number }) => {
-    const response = await apiClient.post('/api/reporting/reports/data-quality-lineage/auto', request || {})
-    return response.data
-  },
-  getAutoDataQualityLineageReports: async (limit: number = 20) => {
-    const response = await apiClient.get('/api/reporting/reports/data-quality-lineage/auto', { params: { limit } })
     return response.data
   },
   runReportBuilder: async (request: {
@@ -550,15 +576,16 @@ export const well3DAPI = {
   getWells: async () => {
     try {
       const response = await apiClient.get('/api/digital-twin/wells')
-      return response.data
+      const data = response.data
+      const list = Array.isArray(data) ? data : data?.wells
+      if (Array.isArray(list) && list.length >= 8) return list
+      // Fallback / enrich: میدان دهلران — ۱۶ حلقه
+      return Array.from({ length: 16 }, (_, i) => `DEH-${String(i + 1).padStart(2, '0')}`)
     } catch (error: any) {
-      // Handle network errors gracefully
       if (error.code === 'ERR_NETWORK' || error.code === 'ERR_EMPTY_RESPONSE' || error.message?.includes('Failed to fetch') || error.isNetworkError) {
-        // Service is not available, return default wells
-        return ['PROD-001', 'PROD-002', 'DEV-001', 'OBS-001']
+        return Array.from({ length: 16 }, (_, i) => `DEH-${String(i + 1).padStart(2, '0')}`)
       }
-      // For other errors, also return default wells
-      return ['PROD-001', 'PROD-002', 'DEV-001', 'OBS-001']
+      return Array.from({ length: 16 }, (_, i) => `DEH-${String(i + 1).padStart(2, '0')}`)
     }
   }
 }
@@ -582,6 +609,10 @@ export const kpiAPI = {
   },
   getCacheStats: async () => {
     const response = await apiClient.get('/kpi/cache-stats')
+    return response.data
+  },
+  recordFeatureUsage: async (feature: string) => {
+    const response = await apiClient.post('/kpi/feature-usage', { feature })
     return response.data
   },
 }

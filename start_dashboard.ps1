@@ -1,8 +1,8 @@
-# PowerShell script to start OGIM Dashboard
+# PowerShell script to start SOGF Dashboard
 # This script starts backend services manually (without Docker)
 
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "Starting OGIM Dashboard" -ForegroundColor Cyan
+Write-Host "Starting SOGF Dashboard" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -131,13 +131,12 @@ Write-Host ""
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host "Dashboard URLs:" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "Frontend: http://localhost:5173" -ForegroundColor Green
+Write-Host "Frontend: http://localhost:3000" -ForegroundColor Green
 Write-Host "API Gateway: http://localhost:18000" -ForegroundColor Green
 Write-Host "API Docs: http://localhost:18000/docs" -ForegroundColor Green
 Write-Host ""
-Write-Host "Default Login:" -ForegroundColor Yellow
-Write-Host "  Username: admin" -ForegroundColor White
-Write-Host "  Password: Admin@123" -ForegroundColor White
+Write-Host "برای اجرای زنده بدون اینترنت (فقط فرانت‌اند):" -ForegroundColor Yellow
+Write-Host "  .\start_offline_dashboard.ps1" -ForegroundColor White
 Write-Host ""
 Write-Host "======================================" -ForegroundColor Cyan
 

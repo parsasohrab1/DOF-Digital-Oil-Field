@@ -89,9 +89,7 @@ def test_proxy_downstream_error_propagates_status(monkeypatch):
 def test_proxy_non_json_response(monkeypatch):
     stub_decode_token(monkeypatch)
     downstream_response = httpx.Response(
-        status_code=200,
-        content=b"plain-text",
-        headers={"content-type": "text/plain"}
+        status_code=200, content=b"plain-text", headers={"content-type": "text/plain"}
     )
     stub_async_client(monkeypatch, response=downstream_response)
 
@@ -166,12 +164,59 @@ def test_kpi_cache_stats_endpoint():
     assert "hits" in response.json()
 
 
+def test_kpi_feature_usage_endpoint():
+    response = client.post("/kpi/feature-usage", json={"feature": "dashboard"})
+    assert response.status_code == 200
+    assert response.json()["recorded"] is True
+
+    bad = client.post("/kpi/feature-usage", json={"feature": "<script>"})
+    assert bad.status_code == 400
+
+    empty = client.post("/kpi/feature-usage", json={"feature": ""})
+    assert empty.status_code == 400
+
+
+def test_kpi_cache_invalidate_endpoint():
+    response = client.post("/kpi/cache/invalidate", json={})
+    assert response.status_code == 200
+    assert response.json()["invalidated"] is True
+
+
+def test_proxy_blocks_oversized_body(monkeypatch):
+    stub_decode_token(monkeypatch)
+    api_gateway.settings.API_SECURITY_MAX_BODY_BYTES = 32
+    response = client.post(
+        "/api/alert/alerts",
+        headers={**auth_header(), "Content-Type": "application/json"},
+        content=b'{"message":"' + (b"x" * 100) + b'"}',
+    )
+    assert response.status_code == 413
+
+
+def test_proxy_blocks_too_many_query_params(monkeypatch):
+    stub_decode_token(monkeypatch)
+    api_gateway.settings.API_SECURITY_MAX_QUERY_PARAMS = 3
+    qs = "&".join([f"p{i}=v" for i in range(10)])
+    response = client.get(f"/api/alert/alerts?{qs}", headers=auth_header())
+    assert response.status_code == 400
+    assert "Too many query parameters" in response.json()["detail"]
+
+
 def test_security_siem_events_endpoint():
     response = client.get("/security/siem/events?limit=5")
     assert response.status_code == 200
     body = response.json()
     assert "events" in body
     assert "summary" in body
+
+
+def test_security_threat_status_endpoint():
+    response = client.get("/security/threat/status")
+    assert response.status_code == 200
+    body = response.json()
+    assert "zero_trust_enforced" in body
+    assert "api_security_hardening" in body
+    assert "threat_block_threshold" in body
 
 
 def test_internal_realtime_publish_rejects_wrong_token():
@@ -208,4 +253,3 @@ def test_realtime_websocket_delivers_pushed_event_immediately():
         message = websocket.receive_json()
         assert message["type"] == "sensor_data"
         assert message["data"]["sensor_records"][0]["sensor_id"] == "WELL-1-pressure"
-

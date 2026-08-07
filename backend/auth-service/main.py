@@ -44,7 +44,7 @@ logger = setup_logging("auth-service")
 app = FastAPI(
     title="OGIM Auth Service",
     version="1.0.0",
-    description="Authentication and Authorization Service"
+    description="Authentication and Authorization Service",
 )
 
 setup_metrics(app, "auth-service")
@@ -86,7 +86,7 @@ class UserResponse(BaseModel):
     role: str
     disabled: bool
     two_factor_enabled: bool
-    
+
     class Config:
         from_attributes = True
 
@@ -101,8 +101,7 @@ class TwoFactorVerify(BaseModel):
 
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> User:
     """Get current authenticated user"""
     credentials_exception = HTTPException(
@@ -110,7 +109,7 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     try:
         payload = decode_token(token)
         username: str = payload.get("sub")
@@ -118,25 +117,24 @@ async def get_current_user(
             raise credentials_exception
     except ValueError:
         raise credentials_exception
-    
+
     user = db.query(User).filter(User.username == username).first()
     if user is None:
         raise credentials_exception
-    
+
     if user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
-    
+
     return user
 
 
 async def get_current_active_admin(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ) -> User:
     """Verify user is admin"""
     if current_user.role != "system_admin":
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
         )
     return current_user
 
@@ -152,11 +150,11 @@ async def startup_event():
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
-    _: bool = Depends(rate_limit_dependency)
+    _: bool = Depends(rate_limit_dependency),
 ):
     """Authenticate user and return access token"""
     user = db.query(User).filter(User.username == form_data.username).first()
-    
+
     if not user or not verify_password(form_data.password, user.hashed_password):
         logger.warning(f"Failed login attempt for user: {form_data.username}")
         security_alerts.record_login_failure(form_data.username)
@@ -182,17 +180,13 @@ async def login(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     if user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
-    
+
     # Create tokens
-    access_token = create_access_token(
-        data={"sub": user.username, "role": user.role}
-    )
-    refresh_token = create_refresh_token(
-        data={"sub": user.username}
-    )
+    access_token = create_access_token(data={"sub": user.username, "role": user.role})
+    refresh_token = create_refresh_token(data={"sub": user.username})
     refresh_payload = decode_token(refresh_token)
     refresh_jti = extract_token_jti(refresh_payload)
     expires_at = datetime.utcfromtimestamp(refresh_payload["exp"])
@@ -206,62 +200,61 @@ async def login(
             "role": user.role,
         },
     )
-    
+
     logger.info(f"User logged in: {user.username}")
-    
+
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
     }
 
 
 @app.post("/refresh", response_model=Token)
-async def refresh_token(
-    refresh_token: str,
-    db: Session = Depends(get_db)
-):
+async def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
     """Refresh access token"""
     try:
         payload = decode_token(refresh_token)
         if payload.get("type") != "refresh":
             raise ValueError("Invalid token type")
-        
+
         username: str = payload.get("sub")
         user = db.query(User).filter(User.username == username).first()
-        
+
         if not user or user.disabled:
             raise HTTPException(status_code=401, detail="Invalid token")
 
         old_jti = extract_token_jti(payload)
         if not refresh_token_store.is_token_active(old_jti):
-            raise HTTPException(status_code=401, detail="Refresh token revoked or expired")
-        
+            raise HTTPException(
+                status_code=401, detail="Refresh token revoked or expired"
+            )
+
         # Create new tokens
         new_access_token = create_access_token(
             data={"sub": user.username, "role": user.role}
         )
-        new_refresh_token = create_refresh_token(
-            data={"sub": user.username}
-        )
+        new_refresh_token = create_refresh_token(data={"sub": user.username})
         new_payload = decode_token(new_refresh_token)
         new_jti = extract_token_jti(new_payload)
         new_exp = datetime.utcfromtimestamp(new_payload["exp"])
 
         # revoke old token and register new one
         if old_jti:
-            refresh_token_store.revoke_token(old_jti, datetime.utcfromtimestamp(payload["exp"]))
+            refresh_token_store.revoke_token(
+                old_jti, datetime.utcfromtimestamp(payload["exp"])
+            )
         refresh_token_store.register_token(new_jti, new_exp)
         siem_logger.emit(
             "auth_token_refresh",
             "low",
             {"username": user.username, "old_jti": old_jti, "new_jti": new_jti},
         )
-        
+
         return {
             "access_token": new_access_token,
             "refresh_token": new_refresh_token,
-            "token_type": "bearer"
+            "token_type": "bearer",
         }
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
@@ -277,34 +270,34 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
 async def create_user(
     user: UserCreate,
     current_user: User = Depends(get_current_active_admin),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Create new user (admin only)"""
     # Check if username exists
     existing_user = db.query(User).filter(User.username == user.username).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already exists")
-    
+
     # Check if email exists
     existing_email = db.query(User).filter(User.email == user.email).first()
     if existing_email:
         raise HTTPException(status_code=400, detail="Email already exists")
-    
+
     # Create new user
     db_user = User(
         username=user.username,
         email=user.email,
         hashed_password=get_password_hash(user.password),
         role=user.role,
-        disabled=False
+        disabled=False,
     )
-    
+
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    
+
     logger.info(f"User created: {user.username} by {current_user.username}")
-    
+
     return db_user
 
 
@@ -312,7 +305,7 @@ async def create_user(
 async def get_user(
     username: str,
     current_user: User = Depends(get_current_active_admin),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Get user by username (admin only)"""
     user = db.query(User).filter(User.username == username).first()
@@ -323,48 +316,44 @@ async def get_user(
 
 @app.post("/users/me/2fa/setup", response_model=TwoFactorSetup)
 async def setup_2fa(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     """Setup 2FA for current user"""
     if current_user.two_factor_enabled:
         raise HTTPException(status_code=400, detail="2FA already enabled")
-    
+
     # Generate secret
     secret = generate_2fa_secret()
     qr_uri = generate_2fa_qr_code_uri(secret, current_user.email)
-    
+
     # Save secret (not enabled yet)
     current_user.two_factor_secret = secret
     db.commit()
-    
+
     logger.info(f"2FA setup initiated for user: {current_user.username}")
-    
-    return {
-        "secret": secret,
-        "qr_code_uri": qr_uri
-    }
+
+    return {"secret": secret, "qr_code_uri": qr_uri}
 
 
 @app.post("/users/me/2fa/enable")
 async def enable_2fa(
     verify: TwoFactorVerify,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Enable 2FA after verification"""
     if not current_user.two_factor_secret:
         raise HTTPException(status_code=400, detail="2FA not setup")
-    
+
     if not verify_2fa_token(current_user.two_factor_secret, verify.token):
         raise HTTPException(status_code=400, detail="Invalid 2FA token")
-    
+
     # Enable 2FA
     current_user.two_factor_enabled = True
     db.commit()
-    
+
     logger.info(f"2FA enabled for user: {current_user.username}")
-    
+
     return {"message": "2FA enabled successfully"}
 
 
@@ -372,22 +361,22 @@ async def enable_2fa(
 async def disable_2fa(
     verify: TwoFactorVerify,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Disable 2FA"""
     if not current_user.two_factor_enabled:
         raise HTTPException(status_code=400, detail="2FA not enabled")
-    
+
     if not verify_2fa_token(current_user.two_factor_secret, verify.token):
         raise HTTPException(status_code=400, detail="Invalid 2FA token")
-    
+
     # Disable 2FA
     current_user.two_factor_enabled = False
     current_user.two_factor_secret = None
     db.commit()
-    
+
     logger.info(f"2FA disabled for user: {current_user.username}")
-    
+
     return {"message": "2FA disabled successfully"}
 
 

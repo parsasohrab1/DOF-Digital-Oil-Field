@@ -29,6 +29,8 @@
 
 پایش: `GET /kpi/cache-stats` — header `X-Cache: HIT|MISS`
 
+باطل‌سازی: `POST /kpi/cache/invalidate` با بدنه اختیاری `{ "prefix": "..." }` (بدون prefix کل کش پاک می‌شود).
+
 ## 3. Rate Limiting & Security
 
 - `RATE_LIMIT_ENABLED=true`

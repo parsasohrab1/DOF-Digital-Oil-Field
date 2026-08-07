@@ -80,7 +80,9 @@ class MLflowModelManager:
     """Manage ML models with MLflow"""
 
     def __init__(self, tracking_uri: str = None, model_path: str = "./models"):
-        self.tracking_uri = tracking_uri or os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns")
+        self.tracking_uri = tracking_uri or os.getenv(
+            "MLFLOW_TRACKING_URI", "file:./mlruns"
+        )
         self.model_path = model_path
         mlflow.set_tracking_uri(self.tracking_uri)
 
@@ -104,9 +106,7 @@ class MLflowModelManager:
                 np.random.seed(42)
                 X_train = np.random.normal(100, 20, (1000, 5))
             model = IsolationForest(
-                n_estimators=100,
-                contamination=0.1,
-                random_state=42
+                n_estimators=100, contamination=0.1, random_state=42
             )
             model.fit(X_train)
             mlflow.log_metric("anomaly_rate", (model.predict(X_train) == -1).mean())
@@ -115,14 +115,17 @@ class MLflowModelManager:
             joblib.dump(model, model_path + ".pkl")
             mlflow.sklearn.log_model(model, "model")
             mlflow.register_model(
-                f"runs:/{mlflow.active_run().info.run_id}/model",
-                "anomaly-detection"
+                f"runs:/{mlflow.active_run().info.run_id}/model", "anomaly-detection"
             )
             self.models["anomaly_detection"] = model
             anomaly_rate = (model.predict(X_train) == -1).mean()
-            self._log_model_metrics("anomaly_detection", accuracy=0.89, anomaly_rate=anomaly_rate)
+            self._log_model_metrics(
+                "anomaly_detection", accuracy=0.89, anomaly_rate=anomaly_rate
+            )
 
-    def train_failure_prediction_model(self, X_train: np.ndarray = None, y_train: np.ndarray = None):
+    def train_failure_prediction_model(
+        self, X_train: np.ndarray = None, y_train: np.ndarray = None
+    ):
         """Train failure prediction model"""
         with mlflow.start_run(run_name="failure_prediction_training"):
             if X_train is None or y_train is None:
@@ -132,9 +135,7 @@ class MLflowModelManager:
             scaler = StandardScaler()
             X_scaled = scaler.fit_transform(X_train)
             model = RandomForestClassifier(
-                n_estimators=100,
-                max_depth=10,
-                random_state=42
+                n_estimators=100, max_depth=10, random_state=42
             )
             model.fit(X_scaled, y_train)
             train_accuracy = model.score(X_scaled, y_train)
@@ -145,18 +146,19 @@ class MLflowModelManager:
             joblib.dump(scaler, model_path + "_scaler.pkl")
             mlflow.sklearn.log_model(model, "model")
             mlflow.register_model(
-                f"runs:/{mlflow.active_run().info.run_id}/model",
-                "failure-prediction"
+                f"runs:/{mlflow.active_run().info.run_id}/model", "failure-prediction"
             )
             self.models["failure_prediction"] = model
             self.scalers["failure_prediction"] = scaler
             self._log_model_metrics("failure_prediction", accuracy=train_accuracy)
 
-    def _create_sequences(self, data: np.ndarray, seq_length: int) -> Tuple[np.ndarray, np.ndarray]:
+    def _create_sequences(
+        self, data: np.ndarray, seq_length: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Create sequences for LSTM training"""
         X, y = [], []
         for i in range(len(data) - seq_length):
-            X.append(data[i:(i + seq_length)])
+            X.append(data[i : (i + seq_length)])
             y.append(data[i + seq_length])
         return np.array(X), np.array(y)
 
@@ -167,11 +169,13 @@ class MLflowModelManager:
         forecast_horizon: int = 1,
         epochs: int = 50,
         batch_size: int = 32,
-        validation_split: float = 0.2
+        validation_split: float = 0.2,
     ):
         """Train LSTM model for time series forecasting"""
         if not TENSORFLOW_AVAILABLE:
-            raise RuntimeError("TensorFlow is required for LSTM models. Please install tensorflow.")
+            raise RuntimeError(
+                "TensorFlow is required for LSTM models. Please install tensorflow."
+            )
 
         with mlflow.start_run(run_name="time_series_forecast_training"):
             # Generate sample data if not provided
@@ -179,7 +183,11 @@ class MLflowModelManager:
                 np.random.seed(42)
                 # Generate realistic time series data (sine wave with noise)
                 t = np.arange(0, 2000, 0.1)
-                time_series_data = np.sin(0.1 * t) + 0.5 * np.sin(0.3 * t) + np.random.normal(0, 0.1, len(t))
+                time_series_data = (
+                    np.sin(0.1 * t)
+                    + 0.5 * np.sin(0.3 * t)
+                    + np.random.normal(0, 0.1, len(t))
+                )
                 time_series_data = time_series_data.reshape(-1, 1)
 
             # Normalize data
@@ -195,24 +203,27 @@ class MLflowModelManager:
             y_train, y_test = y[:split_idx], y[split_idx:]
 
             # Build LSTM model
-            model = Sequential([
-                LSTM(50, return_sequences=True, input_shape=(seq_length, 1)),
-                Dropout(0.2),
-                LSTM(50, return_sequences=False),
-                Dropout(0.2),
-                Dense(25),
-                Dense(forecast_horizon)
-            ])
+            model = Sequential(
+                [
+                    LSTM(50, return_sequences=True, input_shape=(seq_length, 1)),
+                    Dropout(0.2),
+                    LSTM(50, return_sequences=False),
+                    Dropout(0.2),
+                    Dense(25),
+                    Dense(forecast_horizon),
+                ]
+            )
 
-            model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+            model.compile(optimizer="adam", loss="mse", metrics=["mae"])
 
             # Train model
-            history = model.fit(
-                X_train, y_train,
+            model.fit(
+                X_train,
+                y_train,
                 epochs=epochs,
                 batch_size=batch_size,
                 validation_data=(X_test, y_test),
-                verbose=1
+                verbose=1,
             )
 
             # Evaluate model
@@ -236,7 +247,7 @@ class MLflowModelManager:
             lstm_params = {
                 "seq_length": seq_length,
                 "forecast_horizon": forecast_horizon,
-                "input_shape": (seq_length, 1)
+                "input_shape": (seq_length, 1),
             }
             joblib.dump(lstm_params, model_path + "_params.pkl")
             self.lstm_params["time_series_forecast"] = lstm_params
@@ -244,8 +255,7 @@ class MLflowModelManager:
             # Log model to MLflow
             mlflow.keras.log_model(model, "model")
             mlflow.register_model(
-                f"runs:/{mlflow.active_run().info.run_id}/model",
-                "time-series-forecast"
+                f"runs:/{mlflow.active_run().info.run_id}/model", "time-series-forecast"
             )
 
             self.models["time_series_forecast"] = model
@@ -257,10 +267,12 @@ class MLflowModelManager:
                 train_loss=train_loss[0],
                 train_mae=train_loss[1],
                 test_loss=test_loss[0],
-                test_mae=test_loss[1]
+                test_mae=test_loss[1],
             )
 
-            logger.info(f"Time series model trained. Train MAE: {train_loss[1]:.4f}, Test MAE: {test_loss[1]:.4f}")
+            logger.info(
+                f"Time series model trained. Train MAE: {train_loss[1]:.4f}, Test MAE: {test_loss[1]:.4f}"
+            )
 
     def _load_local_scaler(self, model_name: str) -> Optional[Any]:
         """Attempt to load a locally stored scaler for the given model."""
@@ -337,15 +349,23 @@ class MLflowModelManager:
     def load_registered_models(self):
         """Best-effort load of supported models from the registry."""
         results = {}
-        for registry_name in ("anomaly-detection", "failure-prediction", "time-series-forecast"):
+        for registry_name in (
+            "anomaly-detection",
+            "failure-prediction",
+            "time-series-forecast",
+        ):
             results[registry_name] = self.load_model(registry_name) is not None
         return results
 
-    def list_model_versions(self, model_name: str, limit: int = 20) -> List[Dict[str, Any]]:
+    def list_model_versions(
+        self, model_name: str, limit: int = 20
+    ) -> List[Dict[str, Any]]:
         """List recent registry versions with run metadata."""
         client = mlflow.tracking.MlflowClient()
         versions = client.search_model_versions(f"name='{model_name}'")
-        versions_sorted = sorted(versions, key=lambda v: int(v.version), reverse=True)[:limit]
+        versions_sorted = sorted(versions, key=lambda v: int(v.version), reverse=True)[
+            :limit
+        ]
 
         result: List[Dict[str, Any]] = []
         for entry in versions_sorted:
@@ -388,7 +408,9 @@ class MLflowModelManager:
             raise ValueError("Baseline or candidate version not found.")
 
         metric_deltas: Dict[str, Dict[str, float]] = {}
-        all_metrics = set(baseline.get("metrics", {}).keys()) | set(candidate.get("metrics", {}).keys())
+        all_metrics = set(baseline.get("metrics", {}).keys()) | set(
+            candidate.get("metrics", {}).keys()
+        )
         for key in all_metrics:
             b_val = baseline.get("metrics", {}).get(key)
             c_val = candidate.get("metrics", {}).get(key)
@@ -401,7 +423,9 @@ class MLflowModelManager:
             }
 
         param_changes: Dict[str, Dict[str, str]] = {}
-        all_params = set(baseline.get("params", {}).keys()) | set(candidate.get("params", {}).keys())
+        all_params = set(baseline.get("params", {}).keys()) | set(
+            candidate.get("params", {}).keys()
+        )
         for key in all_params:
             b_val = str(baseline.get("params", {}).get(key, ""))
             c_val = str(candidate.get("params", {}).get(key, ""))
@@ -428,7 +452,9 @@ class MLflowModelManager:
         if candidate_weight < 0 or candidate_weight > 1:
             raise ValueError("candidate_weight must be between 0 and 1.")
 
-        registry_name = next((k for k, v in MODEL_REGISTRY_TO_KEY.items() if v == model_key), None)
+        registry_name = next(
+            (k for k, v in MODEL_REGISTRY_TO_KEY.items() if v == model_key), None
+        )
         if not registry_name:
             raise ValueError(f"Unknown model key: {model_key}")
 
@@ -448,7 +474,9 @@ class MLflowModelManager:
     def get_ab_test(self, model_key: str) -> Optional[Dict[str, Any]]:
         return self.ab_deployments.get(model_key)
 
-    def resolve_model_for_request(self, model_key: str, request_key: str) -> Tuple[Optional[int], str]:
+    def resolve_model_for_request(
+        self, model_key: str, request_key: str
+    ) -> Tuple[Optional[int], str]:
         """Resolve model version based on configured A/B test and request key."""
         ab_cfg = self.ab_deployments.get(model_key)
         if not ab_cfg:
@@ -457,7 +485,9 @@ class MLflowModelManager:
         bucket = self._stable_bucket(request_key, ab_cfg["seed"])
         selected = "candidate" if bucket < ab_cfg["candidate_weight"] else "baseline"
         selected_version = (
-            ab_cfg["candidate_version"] if selected == "candidate" else ab_cfg["baseline_version"]
+            ab_cfg["candidate_version"]
+            if selected == "candidate"
+            else ab_cfg["baseline_version"]
         )
         ab_cfg["sample_count"] += 1
         if selected == "candidate":
@@ -467,7 +497,9 @@ class MLflowModelManager:
 
         return selected_version, selected
 
-    def set_feature_baseline(self, model_key: str, features: List[Dict[str, float]]) -> Dict[str, Any]:
+    def set_feature_baseline(
+        self, model_key: str, features: List[Dict[str, float]]
+    ) -> Dict[str, Any]:
         """Set baseline feature distribution used for drift checks."""
         if not features:
             raise ValueError("features must not be empty.")
@@ -524,7 +556,9 @@ class MLflowModelManager:
                 "drift": is_feature_drift,
             }
 
-        aggregate_score = float(np.mean([v["z_score"] for v in drifts.values()])) if drifts else 0.0
+        aggregate_score = (
+            float(np.mean([v["z_score"] for v in drifts.values()])) if drifts else 0.0
+        )
         return {
             "model_key": model_key,
             "threshold": threshold,
@@ -540,13 +574,22 @@ class MLflowModelManager:
         value = int(digest[:8], 16)
         return value / 0xFFFFFFFF
 
-    def predict_anomaly(self, features: Dict[str, float], version: Optional[int] = None) -> Dict[str, Any]:
+    def predict_anomaly(
+        self, features: Dict[str, float], version: Optional[int] = None
+    ) -> Dict[str, Any]:
         """Predict anomaly"""
-        model = self.load_model("anomaly-detection", version=version) if version else (
-            self.models.get("anomaly_detection") or self.load_model("anomaly-detection")
+        model = (
+            self.load_model("anomaly-detection", version=version)
+            if version
+            else (
+                self.models.get("anomaly_detection")
+                or self.load_model("anomaly-detection")
+            )
         )
         if model is None:
-            raise RuntimeError("Anomaly detection model not available. Load or train the model before inference.")
+            raise RuntimeError(
+                "Anomaly detection model not available. Load or train the model before inference."
+            )
 
         # Prepare features
         X = np.array([list(features.values())])
@@ -561,18 +604,29 @@ class MLflowModelManager:
         return {
             "prediction": 1.0 if prediction == -1 else 0.0,
             "anomaly_score": float(anomaly_prob),
-            "probability": float(anomaly_prob)
+            "probability": float(anomaly_prob),
         }
 
-    def predict_failure(self, features: Dict[str, float], version: Optional[int] = None) -> Dict[str, Any]:
+    def predict_failure(
+        self, features: Dict[str, float], version: Optional[int] = None
+    ) -> Dict[str, Any]:
         """Predict failure"""
-        model = self.load_model("failure-prediction", version=version) if version else (
-            self.models.get("failure_prediction") or self.load_model("failure-prediction")
+        model = (
+            self.load_model("failure-prediction", version=version)
+            if version
+            else (
+                self.models.get("failure_prediction")
+                or self.load_model("failure-prediction")
+            )
         )
         if model is None:
-            raise RuntimeError("Failure prediction model not available. Load or train the model before inference.")
+            raise RuntimeError(
+                "Failure prediction model not available. Load or train the model before inference."
+            )
 
-        scaler = self.scalers.get("failure_prediction") or self._load_local_scaler("failure_prediction")
+        scaler = self.scalers.get("failure_prediction") or self._load_local_scaler(
+            "failure_prediction"
+        )
 
         # Prepare features
         X = np.array([list(features.values())])
@@ -590,13 +644,11 @@ class MLflowModelManager:
         return {
             "prediction": float(prediction),
             "failure_probability": failure_prob,
-            "probability": failure_prob
+            "probability": failure_prob,
         }
 
     def predict_time_series(
-        self,
-        historical_data: List[float],
-        forecast_steps: int = 1
+        self, historical_data: List[float], forecast_steps: int = 1
     ) -> Dict[str, Any]:
         """Predict future values using LSTM model"""
         if not TENSORFLOW_AVAILABLE:
@@ -606,7 +658,9 @@ class MLflowModelManager:
         if model is None:
             model = self.load_model("time-series-forecast")
         if model is None:
-            raise RuntimeError("Time series forecast model not available. Load or train the model before inference.")
+            raise RuntimeError(
+                "Time series forecast model not available. Load or train the model before inference."
+            )
 
         scaler = self.scalers.get("time_series_forecast")
         if scaler is None:
@@ -624,7 +678,9 @@ class MLflowModelManager:
 
         # Prepare input data
         if len(historical_data) < seq_length:
-            raise ValueError(f"Historical data must have at least {seq_length} points, got {len(historical_data)}")
+            raise ValueError(
+                f"Historical data must have at least {seq_length} points, got {len(historical_data)}"
+            )
 
         # Use last seq_length points
         input_data = np.array(historical_data[-seq_length:]).reshape(-1, 1)
@@ -655,7 +711,7 @@ class MLflowModelManager:
             "predictions": predictions_original_scale,
             "forecast_steps": forecast_steps,
             "sequence_length": seq_length,
-            "confidence": 0.85  # Can be improved with prediction intervals
+            "confidence": 0.85,  # Can be improved with prediction intervals
         }
 
     def get_model_info(self, model_name: str) -> Dict[str, Any]:
@@ -680,7 +736,7 @@ class MLflowModelManager:
                 "stage": latest.current_stage,
                 "metrics": run.data.metrics,
                 "params": run.data.params,
-                "created_at": latest.creation_timestamp
+                "created_at": latest.creation_timestamp,
             }
         except Exception as e:
             logger.error(f"Failed to get model info for {model_name}: {e}")
@@ -725,4 +781,3 @@ def get_mlflow_manager(
             kwargs["tracking_uri"] = tracking_uri
         mlflow_manager = MLflowModelManager(**kwargs)
     return mlflow_manager
-

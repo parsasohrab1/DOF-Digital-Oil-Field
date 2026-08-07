@@ -42,7 +42,9 @@ def require_roles(allowed_roles: Iterable[str]):
 
     allowed = set(allowed_roles)
 
-    def verifier(payload: Dict[str, Any] = Depends(require_authentication)) -> Dict[str, Any]:
+    def verifier(
+        payload: Dict[str, Any] = Depends(require_authentication)
+    ) -> Dict[str, Any]:
         role = payload.get("role")
         if role not in allowed:
             raise HTTPException(
@@ -52,4 +54,3 @@ def require_roles(allowed_roles: Iterable[str]):
         return payload
 
     return verifier
-

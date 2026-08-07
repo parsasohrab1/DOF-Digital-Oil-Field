@@ -15,4 +15,3 @@ opentelemetry-instrumentation-fastapi==0.41b0
 opentelemetry-instrumentation-requests==0.41b0
 opentelemetry-instrumentation-httpx==0.41b0
 httpx==0.25.2
-

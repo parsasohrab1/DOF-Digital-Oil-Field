@@ -1,28 +1,27 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
 import apiClient from '../api/client'
+import {
+  getDehloranMaintenanceSchedule,
+  getDehloranRulPredictions,
+  type DehloranRulPrediction,
+} from '../data/dehloranRul'
 import './Maintenance.css'
 
-interface RULPrediction {
-  equipment_id: string
-  equipment_type: string
-  rul_hours: number
-  rul_days: number
-  confidence: number
-  urgency: string
-  recommendation: string
-  maintenance_window_days: number
-}
+type RULPrediction = DehloranRulPrediction
 
 interface MaintenanceSchedule {
   equipment_id: string
   equipment_type: string
+  equipment_type_fa: string
   maintenance_type: string
+  maintenance_type_fa: string
   scheduled_date: string
   estimated_duration: number
   priority: string
   status: string
+  status_fa: string
 }
 
 interface PreventiveMaintenanceRecommendation {
@@ -41,334 +40,343 @@ interface PreventiveMaintenanceRecommendation {
   roi?: number
 }
 
+const URGENCY_FA: Record<string, string> = {
+  critical: 'بحرانی',
+  high: 'بالا',
+  medium: 'متوسط',
+  low: 'پایین',
+}
+
+const PRIORITY_FA: Record<string, string> = {
+  critical: 'بحرانی',
+  high: 'بالا',
+  medium: 'متوسط',
+  low: 'پایین',
+}
+
 export default function Maintenance() {
   const [selectedEquipment, setSelectedEquipment] = useState<string>('')
 
-  // Fetch RUL predictions
   const { data: rulPredictions, isLoading: rulLoading } = useQuery({
     queryKey: ['rul-predictions'],
-    queryFn: async () => {
-      // Mock data - in production, fetch from API
-      return [
-        {
-          equipment_id: 'PUMP-001',
-          equipment_type: 'pump',
-          rul_hours: 4320,
-          rul_days: 180,
-          confidence: 0.87,
-          urgency: 'medium',
-          recommendation: 'Schedule maintenance within 1 month',
-          maintenance_window_days: 173
-        },
-        {
-          equipment_id: 'COMP-001',
-          equipment_type: 'compressor',
-          rul_hours: 2160,
-          rul_days: 90,
-          confidence: 0.92,
-          urgency: 'high',
-          recommendation: 'Schedule maintenance within 1 week',
-          maintenance_window_days: 83
-        }
-      ] as RULPrediction[]
-    },
-    refetchInterval: 60000, // Refetch every minute
+    queryFn: async () => getDehloranRulPredictions() as RULPrediction[],
+    refetchInterval: 15000,
   })
 
-  // Fetch maintenance schedule
   const { data: maintenanceSchedule } = useQuery({
-    queryKey: ['maintenance-schedule'],
-    queryFn: async () => {
-      // Mock data
-      return [
-        {
-          equipment_id: 'PUMP-001',
-          equipment_type: 'pump',
-          maintenance_type: 'preventive',
-          scheduled_date: '2025-12-20',
-          estimated_duration: 4,
-          priority: 'medium',
-          status: 'scheduled'
-        }
-      ] as MaintenanceSchedule[]
-    },
+    queryKey: ['maintenance-schedule', rulPredictions?.length],
+    queryFn: async () =>
+      getDehloranMaintenanceSchedule(rulPredictions ?? getDehloranRulPredictions()) as MaintenanceSchedule[],
+    enabled: !!rulPredictions?.length,
   })
 
-  // Fetch spare parts optimization
   const { data: spareParts } = useQuery({
     queryKey: ['spare-parts'],
     queryFn: async () => {
-      // Mock data
       return [
-        { part: 'Bearing', current_stock: 5, required: 8, cost: 500 },
-        { part: 'Seal', current_stock: 12, required: 15, cost: 200 },
-        { part: 'Gasket', current_stock: 20, required: 25, cost: 50 },
+        { part: 'یاتاقان', current_stock: 5, required: 8, cost: 500 },
+        { part: 'آب‌بند', current_stock: 12, required: 15, cost: 200 },
+        { part: 'واشر', current_stock: 20, required: 25, cost: 50 },
       ]
     },
   })
 
-  // Fetch preventive maintenance recommendations for oil & gas fields
   const { data: preventiveRecommendations, isLoading: recLoading } = useQuery({
     queryKey: ['preventive-maintenance-recommendations'],
     queryFn: async () => {
       try {
-        // Try to fetch from API
         const response = await apiClient.get('/api/ml-inference/maintenance/recommendations')
         return response.data
-      } catch (error) {
-        // Return comprehensive mock data for oil & gas field maintenance
+      } catch {
         return [
           {
             id: 'PM-001',
             category: 'pressure_maintenance',
-            title: 'Prevent Pressure Decline in Well PROD-001',
-            description: 'Well pressure is declining. It is recommended to inspect check valves and pressure control system.',
-            well_name: 'PROD-001',
+            title: 'جلوگیری از افت فشار در چاه DEH-01',
+            description: 'فشار چاه در حال کاهش است. بازرسی شیر یک‌طرفه و سامانه کنترل فشار توصیه می‌شود.',
+            well_name: 'DEH-01',
             priority: 'high',
-            impact: 'Prevent 15% production decline',
-            estimated_benefit: 'Increase production by 200 bbl/day',
-            action_required: 'Inspect and repair check valves, calibrate pressure gauges, test BOP system',
-            timeframe: 'Urgent - Within 48 hours',
+            impact: 'جلوگیری از ۱۵٪ افت تولید',
+            estimated_benefit: 'افزایش تولید به میزان ۲۰۰ bbl/day',
+            action_required: 'بازرسی و تعمیر شیرهای یک‌طرفه، کالیبره گیج فشار، آزمون سامانه جلوگیری‌کننده از فوران',
+            timeframe: 'فوری — ظرف ۴۸ ساعت',
             cost_estimate: 15000,
-            roi: 350
+            roi: 350,
           },
           {
             id: 'PM-002',
             category: 'production_optimization',
-            title: 'Optimize Production in Well PROD-002',
-            description: 'Well is producing below capacity. Choke adjustment and flow rate optimization is recommended.',
-            well_name: 'PROD-002',
+            title: 'بهینه‌سازی تولید چاه DEH-02',
+            description: 'چاه کمتر از ظرفیت تولید می‌کند. تنظیم شیر کنترل جریان و بهینه‌سازی دبی توصیه می‌شود.',
+            well_name: 'DEH-02',
             priority: 'medium',
-            impact: 'Increase production by 10%',
-            estimated_benefit: 'Increase production by 150 bbl/day',
-            action_required: 'Nodal analysis, adjust choke position, optimize artificial lift',
-            timeframe: 'Within 1 week',
+            impact: 'افزایش تولید به میزان ۱۰٪',
+            estimated_benefit: 'افزایش تولید به میزان ۱۵۰ bbl/day',
+            action_required: 'تحلیل نودال، تنظیم موقعیت شیر کنترل جریان، بهینه‌سازی لیفت مصنوعی',
+            timeframe: 'ظرف ۱ هفته',
             cost_estimate: 8000,
-            roi: 280
+            roi: 280,
           },
           {
             id: 'PM-003',
             category: 'well_integrity',
-            title: 'Inspect Casing Integrity in Well DEV-001',
-            description: 'Signs of corrosion in casing have been observed. Integrity inspection and cement bond evaluation is recommended.',
-            well_name: 'DEV-001',
+            title: 'بازرسی یکپارچگی غلاف چاه DEH-03',
+            description: 'نشانه‌های خوردگی در casing مشاهده شده. بازرسی یکپارچگی و ارزیابی پیوند سیمان توصیه می‌شود.',
+            well_name: 'DEH-03',
             priority: 'critical',
-            impact: 'Prevent leakage and contamination',
-            estimated_benefit: 'Prevent $500,000 emergency repair costs',
-            action_required: 'Casing inspection, Cement bond log, Corrosion monitoring',
-            timeframe: 'Urgent - Within 24 hours',
+            impact: 'جلوگیری از نشتی و آلودگی',
+            estimated_benefit: 'جلوگیری از هزینه تعمیر اضطراری ۵۰۰٬۰۰۰ دلار',
+            action_required: 'بازرسی casing، لاگ پیوند سیمان، پایش خوردگی',
+            timeframe: 'فوری — ظرف ۲۴ ساعت',
             cost_estimate: 25000,
-            roi: 2000
+            roi: 2000,
           },
           {
             id: 'PM-004',
             category: 'pressure_maintenance',
-            title: 'Preventive Maintenance of Gas Lift System',
-            description: 'Gas Lift system requires service. Reduced efficiency can cause pressure decline.',
-            equipment_id: 'GASLIFT-001',
+            title: 'تعمیرات پیشگیرانه سامانه گازلیفت',
+            description: 'سامانه گازلیفت نیاز به سرویس دارد. کاهش بازدهی می‌تواند باعث افت فشار شود.',
+            equipment_id: 'GASLIFT-DEH-04',
+            well_name: 'DEH-04',
             priority: 'high',
-            impact: 'Prevent 20% production decline',
-            estimated_benefit: 'Increase production by 300 bbl/day',
-            action_required: 'Compressor service, inspect gas lines, test control valves',
-            timeframe: 'Within 3 days',
+            impact: 'جلوگیری از ۲۰٪ افت تولید',
+            estimated_benefit: 'افزایش تولید به میزان ۳۰۰ bbl/day',
+            action_required: 'سرویس کمپرسور، بازرسی خطوط گاز، آزمون شیرهای کنترل',
+            timeframe: 'ظرف ۳ روز',
             cost_estimate: 12000,
-            roi: 400
+            roi: 400,
           },
           {
             id: 'PM-005',
             category: 'production_optimization',
-            title: 'Optimize Artificial Lift System',
-            description: 'ESP pump requires adjustment. Optimization can increase production by 12%.',
-            equipment_id: 'ESP-001',
+            title: 'بهینه‌سازی سامانه لیفت مصنوعی',
+            description: 'پمپ درون‌چاهی الکتریکی نیاز به تنظیم دارد. بهینه‌سازی می‌تواند تولید را ۱۲٪ افزایش دهد.',
+            equipment_id: 'ESP-DEH-05',
+            well_name: 'DEH-05',
             priority: 'medium',
-            impact: 'Increase pump efficiency',
-            estimated_benefit: 'Increase production by 180 bbl/day, reduce power consumption by 8%',
-            action_required: 'Adjust frequency, check motor temperature, optimize pump setting',
-            timeframe: 'Within 1 week',
+            impact: 'افزایش بازدهی پمپ',
+            estimated_benefit: 'افزایش تولید ۱۸۰ bbl/day، کاهش مصرف برق ۸٪',
+            action_required: 'تنظیم فرکانس، بررسی دمای موتور، بهینه‌سازی تنظیم پمپ',
+            timeframe: 'ظرف ۱ هفته',
             cost_estimate: 6000,
-            roi: 450
+            roi: 450,
           },
           {
             id: 'PM-006',
             category: 'equipment_health',
-            title: 'Preventive Maintenance of Separator',
-            description: 'Separator requires cleaning and inspection. Deposits can reduce efficiency.',
-            equipment_id: 'SEP-001',
+            title: 'تعمیرات پیشگیرانه جداکننده',
+            description: 'جداکننده نیاز به تمیزکاری و بازرسی دارد. رسوبات می‌توانند بازدهی را کاهش دهند.',
+            equipment_id: 'SEP-DEH-06',
+            well_name: 'DEH-06',
             priority: 'medium',
-            impact: 'Improve separation quality',
-            estimated_benefit: 'Reduce water in oil by 5%, improve product quality',
-            action_required: 'Internal cleaning, inspect plates, test control system',
-            timeframe: 'Within 2 weeks',
+            impact: 'بهبود کیفیت جداسازی',
+            estimated_benefit: 'کاهش ۵٪ آب در نفت، بهبود کیفیت محصول',
+            action_required: 'تمیزکاری داخلی، بازرسی صفحات، آزمون سامانه کنترل',
+            timeframe: 'ظرف ۲ هفته',
             cost_estimate: 10000,
-            roi: 180
+            roi: 180,
           },
           {
             id: 'PM-007',
             category: 'pressure_maintenance',
-            title: 'Prevent Pressure Decline in Pipeline',
-            description: 'Signs of pressure decline in main pipeline have been observed. Leak inspection and deposit evaluation is essential.',
-            equipment_id: 'PIPELINE-001',
+            title: 'جلوگیری از افت فشار در خط لوله',
+            description: 'نشانه‌های افت فشار در خط اصلی مشاهده شده. بازرسی نشتی و ارزیابی رسوب ضروری است.',
+            equipment_id: 'PIPELINE-DEH-07',
+            well_name: 'DEH-07',
             priority: 'high',
-            impact: 'Prevent production shutdown',
-            estimated_benefit: 'Prevent $1,000,000 production shutdown costs',
-            action_required: 'Pipeline inspection, Pigging, Leak detection, Pressure testing',
-            timeframe: 'Urgent - Within 72 hours',
+            impact: 'جلوگیری از توقف تولید',
+            estimated_benefit: 'جلوگیری از هزینه توقف تولید ۱٬۰۰۰٬۰۰۰ دلار',
+            action_required: 'بازرسی خط لوله، پیگینگ، تشخیص نشتی، آزمون فشار',
+            timeframe: 'فوری — ظرف ۷۲ ساعت',
             cost_estimate: 35000,
-            roi: 2857
+            roi: 2857,
           },
           {
             id: 'PM-008',
             category: 'production_optimization',
-            title: 'Optimize Choke Management',
-            description: 'Multiple wells require choke adjustment. Optimization can increase total production by 8%.',
-            well_name: 'Multiple',
+            title: 'بهینه‌سازی مدیریت شیر کنترل جریان',
+            description: 'چندین چاه نیاز به تنظیم شیر کنترل جریان دارند. بهینه‌سازی می‌تواند تولید کل میدان را ۸٪ افزایش دهد.',
+            well_name: 'DEH-01…DEH-16',
             priority: 'medium',
-            impact: 'Increase total field production',
-            estimated_benefit: 'Increase production by 500 bbl/day across entire field',
-            action_required: 'Production profile analysis, adjust choke for each well, continuous monitoring',
-            timeframe: 'Within 2 weeks',
+            impact: 'افزایش تولید کل میدان',
+            estimated_benefit: 'افزایش تولید به میزان ۵۰۰ bbl/day در کل میدان',
+            action_required: 'تحلیل پروفایل تولید، تنظیم شیر کنترل جریان هر چاه، پایش پیوسته',
+            timeframe: 'ظرف ۲ هفته',
             cost_estimate: 15000,
-            roi: 520
+            roi: 520,
           },
           {
             id: 'PM-009',
             category: 'well_integrity',
-            title: 'Inspect and Maintain BOP Stack',
-            description: 'BOP requires testing and inspection. Ensuring proper function is essential for safety.',
-            equipment_id: 'BOP-001',
+            title: 'بازرسی و نگهداری مجموعه جلوگیری‌کننده از فوران',
+            description: 'جلوگیری‌کننده از فوران نیاز به آزمون و بازرسی دارد. اطمینان از عملکرد صحیح برای ایمنی ضروری است.',
+            equipment_id: 'BOP-DEH-08',
+            well_name: 'DEH-08',
             priority: 'critical',
-            impact: 'Safety and prevent blowout',
-            estimated_benefit: 'Prevent incident costing millions of dollars',
-            action_required: 'BOP function test, Pressure test, Visual inspection, Maintenance records review',
-            timeframe: 'Urgent - Within 24 hours',
+            impact: 'ایمنی و جلوگیری از فوران',
+            estimated_benefit: 'جلوگیری از حادثه‌ای با هزینه میلیون‌ها دلار',
+            action_required: 'آزمون عملکرد جلوگیری‌کننده از فوران، آزمون فشار، بازرسی چشمی، مرور سوابق نگهداری',
+            timeframe: 'فوری — ظرف ۲۴ ساعت',
             cost_estimate: 20000,
-            roi: 10000
+            roi: 10000,
           },
           {
             id: 'PM-010',
             category: 'cost_reduction',
-            title: 'Optimize Energy Consumption',
-            description: 'Electrical systems and compressors can operate more efficiently. 15% energy reduction is achievable.',
-            equipment_id: 'POWER-001',
+            title: 'بهینه‌سازی مصرف انرژی',
+            description: 'سامانه‌های برقی و کمپرسورها می‌توانند کارآمدتر عمل کنند. کاهش ۱۵٪ انرژی قابل دستیابی است.',
+            equipment_id: 'POWER-DEH-09',
+            well_name: 'DEH-09',
             priority: 'low',
-            impact: 'Reduce operational costs',
-            estimated_benefit: 'Reduce electricity costs by $25,000 per month',
-            action_required: 'Review load balancing, optimize compressor operation, install VFD',
-            timeframe: 'Within 1 month',
+            impact: 'کاهش هزینه‌های عملیاتی',
+            estimated_benefit: 'کاهش هزینه برق به میزان ۲۵٬۰۰۰ دلار در ماه',
+            action_required: 'بازبینی تعادل بار، بهینه‌سازی کارکرد کمپرسور، نصب درایو فرکانس متغیر',
+            timeframe: 'ظرف ۱ ماه',
             cost_estimate: 50000,
-            roi: 600
-          }
+            roi: 600,
+          },
         ] as PreventiveMaintenanceRecommendation[]
       }
     },
-    refetchInterval: 300000, // Refetch every 5 minutes
+    refetchInterval: 300000,
   })
 
-  if (rulLoading) {
-    return <div className="loading">Loading maintenance data...</div>
+  const urgencyColors: Record<string, string> = {
+    critical: '#c62828',
+    high: '#f9a825',
+    medium: '#0288d1',
+    low: '#2e7d32',
   }
 
-  const rulChartData = rulPredictions?.map(pred => ({
-    equipment: pred.equipment_id,
-    rul_days: pred.rul_days,
-    confidence: (pred.confidence * 100).toFixed(0),
-  })) || []
+  if (rulLoading) {
+    return <div className="loading">در حال بارگذاری داده‌های نگهداری…</div>
+  }
 
-  const urgencyColors: Record<string, string> = {
-    critical: '#dc3545',
-    high: '#ffc107',
-    medium: '#17a2b8',
-    low: '#28a745'
+  const rulChartData = (rulPredictions ?? []).slice(0, 12).map((pred) => ({
+    equipment: pred.equipment_id.replace('ESP-', ''),
+    fullId: pred.equipment_id,
+    rul_days: pred.rul_days,
+    urgency: pred.urgency,
+    confidence: (pred.confidence * 100).toFixed(0),
+  }))
+
+  const categoryLabels: Record<string, string> = {
+    pressure_maintenance: 'نگهداری فشار',
+    production_optimization: 'بهینه‌سازی تولید',
+    well_integrity: 'یکپارچگی چاه',
+    equipment_health: 'سلامت تجهیزات',
+    cost_reduction: 'کاهش هزینه',
   }
 
   return (
-    <div className="maintenance-page">
-      <h2>PDM (Predictive Maintenance)</h2>
+    <div className="maintenance-page" dir="rtl">
+      <h2>نگهداری پیش‌بینانه</h2>
 
       <div className="maintenance-grid">
-        {/* RUL Predictions */}
         <div className="maintenance-card">
-          <h3>Remaining Useful Life (RUL) Predictions</h3>
+          <h3>پیش‌بینی عمر مفید باقی‌مانده</h3>
+          <p className="section-description">۱۲ تجهیز با کمترین عمر مفید باقی‌مانده در میدان دهلران</p>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={rulChartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="equipment" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="rul_days" fill="#8884d8" name="RUL (Days)" />
+            <BarChart data={rulChartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+              <XAxis dataKey="equipment" tick={{ fill: '#555', fontSize: 11 }} />
+              <YAxis tick={{ fill: '#555', fontSize: 11 }} unit=" روز" />
+              <Tooltip
+                contentStyle={{ background: '#ffffff', border: '1px solid #ccc', borderRadius: 8, color: '#111' }}
+                labelStyle={{ color: '#111' }}
+                formatter={(value: number) => [`${value} روز`, 'عمر مفید']}
+              />
+              <Legend wrapperStyle={{ color: '#333' }} />
+              <Bar dataKey="rul_days" name="عمر مفید باقی‌مانده (روز)" radius={[4, 4, 0, 0]}>
+                {rulChartData.map((row) => (
+                  <Cell key={row.fullId} fill={urgencyColors[row.urgency] || '#5c6bc0'} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* RUL Table */}
-        <div className="maintenance-card">
-          <h3>RUL Predictions by Equipment</h3>
+        <div className="maintenance-card full-width">
+          <h3>پیش‌بینی عمر مفید باقی‌مانده به‌ازای تجهیز</h3>
+          <p className="section-description">
+            پمپ‌های درون‌چاهی ۱۶ چاه دهلران به‌همراه تجهیزات تسهیلات مشترک — مرتب‌شده از بحرانی به پایدار
+          </p>
           <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Equipment</th>
-                  <th>Type</th>
-                  <th>RUL (Days)</th>
-                  <th>Confidence</th>
-                  <th>Urgency</th>
-                  <th>Recommendation</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rulPredictions?.map((pred) => (
-                  <tr key={pred.equipment_id}>
-                    <td>{pred.equipment_id}</td>
-                    <td>{pred.equipment_type}</td>
-                    <td>{pred.rul_days.toFixed(0)}</td>
-                    <td>{(pred.confidence * 100).toFixed(0)}%</td>
-                    <td>
-                      <span 
-                        className="urgency-badge" 
-                        style={{ backgroundColor: urgencyColors[pred.urgency] }}
-                      >
-                        {pred.urgency}
-                      </span>
-                    </td>
-                    <td>{pred.recommendation}</td>
+            {!rulPredictions?.length ? (
+              <p className="empty-state">داده‌ای برای نمایش وجود ندارد.</p>
+            ) : (
+              <table className="rul-table">
+                <thead>
+                  <tr>
+                    <th>شناسه تجهیز</th>
+                    <th>چاه / محل</th>
+                    <th>نوع</th>
+                    <th>عمر مفید (روز)</th>
+                    <th>عمر مفید (ساعت)</th>
+                    <th>اطمینان</th>
+                    <th>فوریت</th>
+                    <th>پنجره نگهداری</th>
+                    <th>توصیه</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rulPredictions.map((pred) => (
+                    <tr key={pred.equipment_id} className={`urgency-row-${pred.urgency}`}>
+                      <td className="mono">{pred.equipment_id}</td>
+                      <td>{pred.well_name || 'تسهیلات میدان'}</td>
+                      <td>{pred.equipment_type_fa || pred.equipment_type}</td>
+                      <td>
+                        <strong>{pred.rul_days.toFixed(0)}</strong>
+                      </td>
+                      <td>{pred.rul_hours.toLocaleString('fa-IR')}</td>
+                      <td>{(pred.confidence * 100).toFixed(0)}٪</td>
+                      <td>
+                        <span
+                          className="urgency-badge"
+                          style={{ backgroundColor: urgencyColors[pred.urgency] }}
+                        >
+                          {URGENCY_FA[pred.urgency] || pred.urgency}
+                        </span>
+                      </td>
+                      <td>{pred.maintenance_window_days} روز</td>
+                      <td className="rec-cell">{pred.recommendation}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
-        {/* Maintenance Schedule */}
         <div className="maintenance-card">
-          <h3>Maintenance Schedule</h3>
+          <h3>برنامه نگهداری</h3>
           <div className="table-container">
             <table>
               <thead>
                 <tr>
-                  <th>Equipment</th>
-                  <th>Type</th>
-                  <th>Maintenance Type</th>
-                  <th>Scheduled Date</th>
-                  <th>Duration (hrs)</th>
-                  <th>Priority</th>
-                  <th>Status</th>
+                  <th>تجهیز</th>
+                  <th>نوع</th>
+                  <th>نوع نگهداری</th>
+                  <th>تاریخ برنامه‌ریزی</th>
+                  <th>مدت (ساعت)</th>
+                  <th>اولویت</th>
+                  <th>وضعیت</th>
                 </tr>
               </thead>
               <tbody>
                 {maintenanceSchedule?.map((schedule, idx) => (
                   <tr key={idx}>
                     <td>{schedule.equipment_id}</td>
-                    <td>{schedule.equipment_type}</td>
-                    <td>{schedule.maintenance_type}</td>
-                    <td>{new Date(schedule.scheduled_date).toLocaleDateString()}</td>
+                    <td>{schedule.equipment_type_fa || schedule.equipment_type}</td>
+                    <td>{schedule.maintenance_type_fa || schedule.maintenance_type}</td>
+                    <td>{new Date(schedule.scheduled_date).toLocaleDateString('fa-IR')}</td>
                     <td>{schedule.estimated_duration}</td>
                     <td>
                       <span className={`priority-${schedule.priority}`}>
-                        {schedule.priority}
+                        {PRIORITY_FA[schedule.priority] || schedule.priority}
                       </span>
                     </td>
-                    <td>{schedule.status}</td>
+                    <td>{schedule.status_fa || schedule.status}</td>
                   </tr>
                 ))}
               </tbody>
@@ -376,199 +384,193 @@ export default function Maintenance() {
           </div>
         </div>
 
-        {/* Spare Parts Optimization */}
         <div className="maintenance-card">
-          <h3>Spare Parts Optimization</h3>
+          <h3>بهینه‌سازی قطعات یدکی</h3>
           <div className="spare-parts">
             {spareParts?.map((part, idx) => (
               <div key={idx} className="spare-part-item">
                 <div className="part-name">{part.part}</div>
                 <div className="part-stock">
-                  Stock: {part.current_stock} / Required: {part.required}
+                  موجودی: {part.current_stock} / مورد نیاز: {part.required}
                 </div>
                 <div className="part-status">
                   {part.current_stock >= part.required ? (
-                    <span className="status-ok">✓ Sufficient</span>
+                    <span className="status-ok">✓ کافی</span>
                   ) : (
-                    <span className="status-low">⚠ Low Stock</span>
+                    <span className="status-low">⚠ موجودی کم</span>
                   )}
                 </div>
-                <div className="part-cost">Cost: ${part.cost}</div>
+                <div className="part-cost">هزینه: ${part.cost}</div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Maintenance Cost Forecast */}
         <div className="maintenance-card">
-          <h3>Maintenance Cost Forecast</h3>
+          <h3>پیش‌بینی هزینه نگهداری</h3>
           <div className="cost-forecast">
             <div className="cost-item">
-              <div className="cost-label">This Month</div>
+              <div className="cost-label">این ماه</div>
               <div className="cost-value">$45,000</div>
             </div>
             <div className="cost-item">
-              <div className="cost-label">Next Month</div>
+              <div className="cost-label">ماه آینده</div>
               <div className="cost-value">$52,000</div>
             </div>
             <div className="cost-item">
-              <div className="cost-label">This Quarter</div>
+              <div className="cost-label">این فصل</div>
               <div className="cost-value">$150,000</div>
             </div>
           </div>
         </div>
 
-        {/* Predictive Maintenance Recommendations */}
         <div className="maintenance-card">
-          <h3>Predictive Maintenance Recommendations</h3>
+          <h3>توصیه‌های نگهداری پیش‌بینانه</h3>
           <div className="recommendations">
-            {rulPredictions?.filter(p => p.urgency === 'high' || p.urgency === 'critical').map((pred) => (
-              <div key={pred.equipment_id} className="recommendation-item">
-                <div className="rec-equipment">{pred.equipment_id}</div>
-                <div className="rec-message">{pred.recommendation}</div>
-                <div className="rec-urgency">
-                  Urgency: <span style={{ color: urgencyColors[pred.urgency] }}>{pred.urgency}</span>
+            {rulPredictions
+              ?.filter((p) => p.urgency === 'high' || p.urgency === 'critical')
+              .map((pred) => (
+                <div key={pred.equipment_id} className="recommendation-item">
+                  <div className="rec-equipment">{pred.equipment_id}</div>
+                  <div className="rec-message">{pred.recommendation}</div>
+                  <div className="rec-urgency">
+                    فوریت:{' '}
+                    <span style={{ color: urgencyColors[pred.urgency] }}>
+                      {URGENCY_FA[pred.urgency] || pred.urgency}
+                    </span>
+                  </div>
+                  <div className="rec-window">پنجره نگهداری: {pred.maintenance_window_days} روز</div>
                 </div>
-                <div className="rec-window">
-                  Maintenance Window: {pred.maintenance_window_days} days
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
 
-        {/* Preventive Maintenance Recommendations for Oil & Gas Fields */}
         <div className="maintenance-card full-width">
-          <h3>Preventive Maintenance Recommendations for Oil & Gas Fields</h3>
+          <h3>توصیه‌های نگهداری پیشگیرانه میدان نفت و گاز</h3>
           <p className="section-description">
-            Intelligent recommendations for preventing pressure decline, optimizing production, and preventive equipment maintenance
+            توصیه‌های هوشمند برای جلوگیری از افت فشار، بهینه‌سازی تولید و نگهداری پیشگیرانه تجهیزات
           </p>
-          
+
           {recLoading ? (
-            <div className="loading">Loading recommendations...</div>
+            <div className="loading">در حال بارگذاری توصیه‌ها…</div>
           ) : (
             <div className="preventive-recommendations">
-              {/* Filter by category */}
               <div className="recommendation-filters">
-                <button 
-                  className="filter-btn active"
-                  onClick={() => setSelectedEquipment('all')}
-                >
-                  All
+                <button className="filter-btn active" onClick={() => setSelectedEquipment('all')}>
+                  همه
                 </button>
-                <button 
+                <button
                   className="filter-btn"
                   onClick={() => setSelectedEquipment('pressure_maintenance')}
                 >
-                  Pressure Maintenance
+                  نگهداری فشار
                 </button>
-                <button 
+                <button
                   className="filter-btn"
                   onClick={() => setSelectedEquipment('production_optimization')}
                 >
-                  Production Optimization
+                  بهینه‌سازی تولید
                 </button>
-                <button 
-                  className="filter-btn"
-                  onClick={() => setSelectedEquipment('well_integrity')}
-                >
-                  Well Integrity
+                <button className="filter-btn" onClick={() => setSelectedEquipment('well_integrity')}>
+                  یکپارچگی چاه
                 </button>
-                <button 
+                <button
                   className="filter-btn"
                   onClick={() => setSelectedEquipment('equipment_health')}
                 >
-                  Equipment Health
+                  سلامت تجهیزات
                 </button>
               </div>
 
-              {/* Recommendations List */}
               <div className="preventive-recommendations-list">
                 {preventiveRecommendations
-                  ?.filter((rec: PreventiveMaintenanceRecommendation) => 
-                    selectedEquipment === '' || 
-                    selectedEquipment === 'all' || 
-                    rec.category === selectedEquipment
+                  ?.filter(
+                    (rec: PreventiveMaintenanceRecommendation) =>
+                      selectedEquipment === '' ||
+                      selectedEquipment === 'all' ||
+                      rec.category === selectedEquipment
                   )
-                  .sort((a: PreventiveMaintenanceRecommendation, b: PreventiveMaintenanceRecommendation) => {
-                    const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 }
-                    return priorityOrder[a.priority] - priorityOrder[b.priority]
-                  })
-                  .map((rec: PreventiveMaintenanceRecommendation) => {
-                    const categoryLabels: Record<string, string> = {
-                      pressure_maintenance: 'Pressure Maintenance',
-                      production_optimization: 'Production Optimization',
-                      well_integrity: 'Well Integrity',
-                      equipment_health: 'Equipment Health',
-                      cost_reduction: 'Cost Reduction'
+                  .sort(
+                    (
+                      a: PreventiveMaintenanceRecommendation,
+                      b: PreventiveMaintenanceRecommendation
+                    ) => {
+                      const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 }
+                      return priorityOrder[a.priority] - priorityOrder[b.priority]
                     }
-
-                    return (
-                      <div 
-                        key={rec.id} 
-                        className={`preventive-rec-item priority-${rec.priority}`}
-                      >
-                        <div className="rec-header">
-                          <div className="rec-title-section">
-                            <h4>{rec.title}</h4>
-                            <span className="rec-category">{categoryLabels[rec.category] || rec.category}</span>
-                          </div>
-                          <div className="rec-priority-badge" style={{ backgroundColor: urgencyColors[rec.priority] }}>
-                            {rec.priority === 'critical' ? 'Critical' : 
-                             rec.priority === 'high' ? 'High' :
-                             rec.priority === 'medium' ? 'Medium' : 'Low'}
-                          </div>
+                  )
+                  .map((rec: PreventiveMaintenanceRecommendation) => (
+                    <div
+                      key={rec.id}
+                      className={`preventive-rec-item priority-${rec.priority}`}
+                    >
+                      <div className="rec-header">
+                        <div className="rec-title-section">
+                          <h4>{rec.title}</h4>
+                          <span className="rec-category">
+                            {categoryLabels[rec.category] || rec.category}
+                          </span>
                         </div>
-                        
-                        <div className="rec-body">
-                          <p className="rec-description">{rec.description}</p>
-                          
-                          <div className="rec-details-grid">
-                            <div className="rec-detail-item">
-                              <span className="detail-label">Well/Equipment:</span>
-                              <span className="detail-value">{rec.well_name || rec.equipment_id || 'General'}</span>
-                            </div>
-                            <div className="rec-detail-item">
-                              <span className="detail-label">Impact:</span>
-                              <span className="detail-value">{rec.impact}</span>
-                            </div>
-                            <div className="rec-detail-item">
-                              <span className="detail-label">Estimated Benefit:</span>
-                              <span className="detail-value highlight">{rec.estimated_benefit}</span>
-                            </div>
-                            <div className="rec-detail-item">
-                              <span className="detail-label">Timeframe:</span>
-                              <span className="detail-value">{rec.timeframe}</span>
-                            </div>
-                            {rec.cost_estimate && (
-                              <div className="rec-detail-item">
-                                <span className="detail-label">Estimated Cost:</span>
-                                <span className="detail-value">${rec.cost_estimate.toLocaleString()}</span>
-                              </div>
-                            )}
-                            {rec.roi && (
-                              <div className="rec-detail-item">
-                                <span className="detail-label">Return on Investment (ROI):</span>
-                                <span className="detail-value highlight">{rec.roi}x</span>
-                              </div>
-                            )}
-                          </div>
+                        <div
+                          className="rec-priority-badge"
+                          style={{ backgroundColor: urgencyColors[rec.priority] }}
+                        >
+                          {PRIORITY_FA[rec.priority] || rec.priority}
+                        </div>
+                      </div>
 
-                          <div className="rec-actions">
-                            <div className="action-required">
-                              <strong>Actions Required:</strong>
-                              <p>{rec.action_required}</p>
+                      <div className="rec-body">
+                        <p className="rec-description">{rec.description}</p>
+
+                        <div className="rec-details-grid">
+                          <div className="rec-detail-item">
+                            <span className="detail-label">چاه/تجهیز:</span>
+                            <span className="detail-value">
+                              {rec.well_name || rec.equipment_id || 'عمومی'}
+                            </span>
+                          </div>
+                          <div className="rec-detail-item">
+                            <span className="detail-label">اثر:</span>
+                            <span className="detail-value">{rec.impact}</span>
+                          </div>
+                          <div className="rec-detail-item">
+                            <span className="detail-label">سود برآوردی:</span>
+                            <span className="detail-value highlight">{rec.estimated_benefit}</span>
+                          </div>
+                          <div className="rec-detail-item">
+                            <span className="detail-label">بازه زمانی:</span>
+                            <span className="detail-value">{rec.timeframe}</span>
+                          </div>
+                          {rec.cost_estimate && (
+                            <div className="rec-detail-item">
+                              <span className="detail-label">هزینه برآوردی:</span>
+                              <span className="detail-value">
+                                ${rec.cost_estimate.toLocaleString()}
+                              </span>
                             </div>
+                          )}
+                          {rec.roi && (
+                            <div className="rec-detail-item">
+                              <span className="detail-label">بازگشت سرمایه (ROI):</span>
+                              <span className="detail-value highlight">{rec.roi}x</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rec-actions">
+                          <div className="action-required">
+                            <strong>اقدامات لازم:</strong>
+                            <p>{rec.action_required}</p>
                           </div>
                         </div>
                       </div>
-                    )
-                  })}
+                    </div>
+                  ))}
               </div>
 
               {preventiveRecommendations && preventiveRecommendations.length === 0 && (
                 <div className="no-recommendations">
-                  <p>No recommendations available at this time.</p>
+                  <p>در حال حاضر توصیه‌ای موجود نیست.</p>
                 </div>
               )}
             </div>
@@ -578,4 +580,3 @@ export default function Maintenance() {
     </div>
   )
 }
-

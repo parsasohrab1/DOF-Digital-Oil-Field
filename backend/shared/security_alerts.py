@@ -31,13 +31,17 @@ class SecurityAlerts:
             count = self.redis_client.incr(self._key(username))
             self.redis_client.expire(self._key(username), 3600)
         else:
-            count, expires = self.memory_store.get(username, (0, datetime.utcnow() + timedelta(hours=1)))
+            count, expires = self.memory_store.get(
+                username, (0, datetime.utcnow() + timedelta(hours=1))
+            )
             if expires < datetime.utcnow():
                 count = 0
                 expires = datetime.utcnow() + timedelta(hours=1)
             count += 1
             self.memory_store[username] = (count, expires)
-        self._maybe_alert(username, count if self.redis_client else self.memory_store[username][0])
+        self._maybe_alert(
+            username, count if self.redis_client else self.memory_store[username][0]
+        )
 
     def reset_user(self, username: str):
         if self.redis_client:
@@ -47,8 +51,9 @@ class SecurityAlerts:
 
     def _maybe_alert(self, username: str, count: int):
         if count >= self.threshold:
-            logger.warning("Multiple failed logins for user=%s count=%s", username, count)
+            logger.warning(
+                "Multiple failed logins for user=%s count=%s", username, count
+            )
 
 
 security_alerts = SecurityAlerts()
-

@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from shared.auth import require_authentication, require_roles
 from shared.metrics import setup_metrics
 from shared.tracing import setup_tracing
+
 # Role-based dependencies
 require_tag_read = require_authentication
 require_tag_write = require_roles({"system_admin", "data_engineer"})
@@ -89,7 +90,9 @@ async def startup_event():
     """Initialize database on startup"""
     logger.info("Starting tag catalog service...")
     try:
-        logger.info("Tag catalog service ready. Ensure database migrations are applied.")
+        logger.info(
+            "Tag catalog service ready. Ensure database migrations are applied."
+        )
     except Exception as e:
         logger.error(f"Startup error: {e}")
 
@@ -99,20 +102,20 @@ async def list_tags(
     well_name: Optional[str] = None,
     status: Optional[str] = None,
     db: Session = Depends(get_db),
-    _: Dict[str, Any] = Depends(require_tag_read)
+    _: Dict[str, Any] = Depends(require_tag_read),
 ):
     """List all tags with optional filtering"""
     query = db.query(Tag)
-    
+
     if well_name:
         query = query.filter(Tag.well_name == well_name)
     if status:
         query = query.filter(Tag.status == status)
-    
+
     tags = query.all()
     return {
         "tags": [TagResponse.model_validate(tag).model_dump() for tag in tags],
-        "count": len(tags)
+        "count": len(tags),
     }
 
 
@@ -120,7 +123,7 @@ async def list_tags(
 async def get_tag(
     tag_id: str,
     db: Session = Depends(get_db),
-    _: Dict[str, Any] = Depends(require_tag_read)
+    _: Dict[str, Any] = Depends(require_tag_read),
 ):
     """Get tag metadata by ID"""
     tag = db.query(Tag).filter(Tag.tag_id == tag_id).first()
@@ -133,12 +136,12 @@ async def get_tag(
 async def create_tag(
     tag: TagMetadata,
     db: Session = Depends(get_db),
-    _: Dict[str, Any] = Depends(require_tag_write)
+    _: Dict[str, Any] = Depends(require_tag_write),
 ):
     """Create or update tag metadata"""
     # Check if tag exists
     existing_tag = db.query(Tag).filter(Tag.tag_id == tag.tag_id).first()
-    
+
     if existing_tag:
         # Update existing tag
         for key, value in tag.dict(exclude_unset=True).items():
@@ -162,16 +165,16 @@ async def update_tag(
     tag_id: str,
     tag: TagMetadata,
     db: Session = Depends(get_db),
-    _: Dict[str, Any] = Depends(require_tag_write)
+    _: Dict[str, Any] = Depends(require_tag_write),
 ):
     """Update tag metadata"""
     db_tag = db.query(Tag).filter(Tag.tag_id == tag_id).first()
     if not db_tag:
         raise HTTPException(status_code=404, detail="Tag not found")
-    
+
     for key, value in tag.dict(exclude_unset=True).items():
         setattr(db_tag, key, value)
-    
+
     db.commit()
     db.refresh(db_tag)
     logger.info(f"Tag updated: {tag_id}")
@@ -182,13 +185,13 @@ async def update_tag(
 async def delete_tag(
     tag_id: str,
     db: Session = Depends(get_db),
-    _: Dict[str, Any] = Depends(require_tag_admin)
+    _: Dict[str, Any] = Depends(require_tag_admin),
 ):
     """Delete tag (soft delete by setting status)"""
     db_tag = db.query(Tag).filter(Tag.tag_id == tag_id).first()
     if not db_tag:
         raise HTTPException(status_code=404, detail="Tag not found")
-    
+
     db_tag.status = "deleted"
     db.commit()
     logger.info(f"Tag deleted: {tag_id}")
@@ -204,4 +207,3 @@ async def health(db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8007)
-

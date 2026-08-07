@@ -20,17 +20,19 @@ class CompressionManager:
     Manages TimescaleDB compression policies
     مدیریت سیاست‌های فشرده‌سازی TimescaleDB
     """
-    
+
     def __init__(self):
         self.compression_threshold_days = 90  # Compress data older than 90 days
-        self.compression_segmentby = 'tag_id'  # Segment by tag_id for better compression
-    
+        self.compression_segmentby = (
+            "tag_id"  # Segment by tag_id for better compression
+        )
+
     def enable_compression(
         self,
         table_name: str,
         segmentby_column: Optional[str] = None,
         orderby_column: Optional[str] = None,
-        session: Optional[Session] = None
+        session: Optional[Session] = None,
     ) -> bool:
         """
         Enable compression on a hypertable
@@ -41,11 +43,13 @@ class CompressionManager:
                 conn = session.connection()
             else:
                 conn = timescale_engine.connect()
-            
+
             try:
                 table_name = validate_hypertable_name(conn, table_name)
-                segmentby = validate_column_identifier(segmentby_column or self.compression_segmentby)
-                orderby = validate_column_identifier(orderby_column or 'timestamp DESC')
+                segmentby = validate_column_identifier(
+                    segmentby_column or self.compression_segmentby
+                )
+                orderby = validate_column_identifier(orderby_column or "timestamp DESC")
 
                 query = f"""
                     ALTER TABLE {table_name} SET (
@@ -54,10 +58,10 @@ class CompressionManager:
                         timescaledb.compress_orderby = '{orderby}'
                     );
                 """
-                
+
                 conn.execute(text(query))
                 conn.commit()
-                
+
                 logger.info(f"Compression enabled for {table_name}")
                 return True
             finally:
@@ -66,13 +70,13 @@ class CompressionManager:
         except Exception as e:
             logger.error(f"Failed to enable compression for {table_name}: {e}")
             return False
-    
+
     def add_compression_policy(
         self,
         table_name: str,
         compress_after_days: int = 90,
         if_not_exists: bool = True,
-        session: Optional[Session] = None
+        session: Optional[Session] = None,
     ) -> bool:
         """
         Add compression policy to compress chunks older than specified days
@@ -83,10 +87,9 @@ class CompressionManager:
                 conn = session.connection()
             else:
                 conn = timescale_engine.connect()
-            
+
             try:
                 table_name = validate_hypertable_name(conn, table_name)
-                compress_after = timedelta(days=compress_after_days)
 
                 if if_not_exists:
                     # Check if policy already exists
@@ -98,11 +101,13 @@ class CompressionManager:
                     """
                     result = conn.execute(text(check_query))
                     count = result.fetchone()[0]
-                    
+
                     if count > 0:
-                        logger.info(f"Compression policy already exists for {table_name}")
+                        logger.info(
+                            f"Compression policy already exists for {table_name}"
+                        )
                         return True
-                
+
                 query = f"""
                     SELECT add_compression_policy(
                         '{table_name}',
@@ -110,10 +115,10 @@ class CompressionManager:
                         if_not_exists => {str(if_not_exists).lower()}
                     );
                 """
-                
+
                 conn.execute(text(query))
                 conn.commit()
-                
+
                 logger.info(
                     f"Compression policy added for {table_name}: "
                     f"compress chunks older than {compress_after_days} days"
@@ -125,11 +130,9 @@ class CompressionManager:
         except Exception as e:
             logger.error(f"Failed to add compression policy for {table_name}: {e}")
             return False
-    
+
     def remove_compression_policy(
-        self,
-        table_name: str,
-        session: Optional[Session] = None
+        self, table_name: str, session: Optional[Session] = None
     ) -> bool:
         """
         Remove compression policy from a hypertable
@@ -140,16 +143,16 @@ class CompressionManager:
                 conn = session.connection()
             else:
                 conn = timescale_engine.connect()
-            
+
             try:
                 table_name = validate_hypertable_name(conn, table_name)
                 query = f"""
                     SELECT remove_compression_policy('{table_name}', if_exists => true);
                 """
-                
+
                 conn.execute(text(query))
                 conn.commit()
-                
+
                 logger.info(f"Compression policy removed for {table_name}")
                 return True
             finally:
@@ -158,11 +161,9 @@ class CompressionManager:
         except Exception as e:
             logger.error(f"Failed to remove compression policy for {table_name}: {e}")
             return False
-    
+
     def get_compression_status(
-        self,
-        table_name: str,
-        session: Optional[Session] = None
+        self, table_name: str, session: Optional[Session] = None
     ) -> Dict[str, any]:
         """
         Get compression status for a hypertable
@@ -173,7 +174,7 @@ class CompressionManager:
                 conn = session.connection()
             else:
                 conn = timescale_engine.connect()
-            
+
             try:
                 table_name = validate_hypertable_name(conn, table_name)
 
@@ -195,13 +196,13 @@ class CompressionManager:
                     WHERE h.hypertable_name = '{table_name}'
                     GROUP BY h.hypertable_name, h.compression_enabled, h.compression_status;
                 """
-                
+
                 result = conn.execute(text(settings_query))
                 row = result.fetchone()
-                
+
                 if not row:
                     return {"error": f"Hypertable {table_name} not found"}
-                
+
                 # Get compression policy
                 policy_query = f"""
                     SELECT 
@@ -213,10 +214,10 @@ class CompressionManager:
                     WHERE j.proc_name = 'policy_compression'
                     AND j.hypertable_name = '{table_name}';
                 """
-                
+
                 policy_result = conn.execute(text(policy_query))
                 policy_row = policy_result.fetchone()
-                
+
                 status = {
                     "hypertable_name": row.hypertable_name,
                     "compression_enabled": row.compression_enabled,
@@ -228,9 +229,9 @@ class CompressionManager:
                     "compressed_size": row.compressed_size or "0 bytes",
                     "uncompressed_size": row.uncompressed_size or "0 bytes",
                     "compression_ratio": None,
-                    "policy": None
+                    "policy": None,
                 }
-                
+
                 # Calculate compression ratio
                 if row.compressed_chunks and row.compressed_chunks > 0:
                     # Get actual sizes
@@ -247,19 +248,21 @@ class CompressionManager:
                             uncompressed_bytes = self._parse_size(row.uncompressed_size)
                             compressed_bytes = self._parse_size(row.compressed_size)
                             if uncompressed_bytes > 0:
-                                ratio = (1 - compressed_bytes / uncompressed_bytes) * 100
+                                ratio = (
+                                    1 - compressed_bytes / uncompressed_bytes
+                                ) * 100
                                 status["compression_ratio"] = f"{ratio:.1f}%"
                         except:
                             pass
-                
+
                 # Get policy info
                 if policy_row:
                     status["policy"] = {
                         "job_id": policy_row.job_id,
                         "scheduled": policy_row.scheduled,
-                        "config": policy_row.config
+                        "config": policy_row.config,
                     }
-                
+
                 return status
             finally:
                 if not session:
@@ -267,26 +270,26 @@ class CompressionManager:
         except Exception as e:
             logger.error(f"Failed to get compression status for {table_name}: {e}")
             return {"error": str(e)}
-    
+
     def _parse_size(self, size_str: str) -> int:
         """Parse size string to bytes"""
         size_str = size_str.strip().upper()
-        if size_str.endswith('KB'):
+        if size_str.endswith("KB"):
             return int(float(size_str[:-2]) * 1024)
-        elif size_str.endswith('MB'):
+        elif size_str.endswith("MB"):
             return int(float(size_str[:-2]) * 1024 * 1024)
-        elif size_str.endswith('GB'):
+        elif size_str.endswith("GB"):
             return int(float(size_str[:-2]) * 1024 * 1024 * 1024)
-        elif size_str.endswith('TB'):
+        elif size_str.endswith("TB"):
             return int(float(size_str[:-2]) * 1024 * 1024 * 1024 * 1024)
         else:
             return int(float(size_str))
-    
+
     def compress_chunks_manually(
         self,
         table_name: str,
         older_than_days: int = 90,
-        session: Optional[Session] = None
+        session: Optional[Session] = None,
     ) -> Dict[str, any]:
         """
         Manually compress chunks older than specified days
@@ -297,7 +300,7 @@ class CompressionManager:
                 conn = session.connection()
             else:
                 conn = timescale_engine.connect()
-            
+
             try:
                 table_name = validate_hypertable_name(conn, table_name)
                 cutoff_time = datetime.utcnow() - timedelta(days=older_than_days)
@@ -311,13 +314,13 @@ class CompressionManager:
                     AND range_end < '{cutoff_time.isoformat()}'
                     ORDER BY range_start;
                 """
-                
+
                 chunks_result = conn.execute(text(chunks_query))
                 chunks = chunks_result.fetchall()
-                
+
                 compressed_count = 0
                 failed_chunks = []
-                
+
                 for chunk in chunks:
                     try:
                         compress_query = f"""
@@ -328,13 +331,15 @@ class CompressionManager:
                         compressed_count += 1
                         logger.info(f"Compressed chunk: {chunk.chunk_name}")
                     except Exception as e:
-                        logger.error(f"Failed to compress chunk {chunk.chunk_name}: {e}")
+                        logger.error(
+                            f"Failed to compress chunk {chunk.chunk_name}: {e}"
+                        )
                         failed_chunks.append(chunk.chunk_name)
-                
+
                 return {
                     "compressed_count": compressed_count,
                     "failed_chunks": failed_chunks,
-                    "total_chunks": len(chunks)
+                    "total_chunks": len(chunks),
                 }
             finally:
                 if not session:
@@ -342,11 +347,9 @@ class CompressionManager:
         except Exception as e:
             logger.error(f"Failed to compress chunks manually: {e}")
             return {"error": str(e)}
-    
+
     def get_chunk_statistics(
-        self,
-        table_name: str,
-        session: Optional[Session] = None
+        self, table_name: str, session: Optional[Session] = None
     ) -> List[Dict[str, any]]:
         """
         Get detailed chunk statistics
@@ -357,7 +360,7 @@ class CompressionManager:
                 conn = session.connection()
             else:
                 conn = timescale_engine.connect()
-            
+
             try:
                 table_name = validate_hypertable_name(conn, table_name)
                 query = f"""
@@ -373,20 +376,26 @@ class CompressionManager:
                     ORDER BY range_start DESC
                     LIMIT 100;
                 """
-                
+
                 result = conn.execute(text(query))
-                
+
                 chunks = []
                 for row in result:
-                    chunks.append({
-                        "chunk_name": row.chunk_name,
-                        "range_start": row.range_start.isoformat() if row.range_start else None,
-                        "range_end": row.range_end.isoformat() if row.range_end else None,
-                        "is_compressed": row.is_compressed,
-                        "size": row.size,
-                        "size_bytes": row.size_bytes
-                    })
-                
+                    chunks.append(
+                        {
+                            "chunk_name": row.chunk_name,
+                            "range_start": row.range_start.isoformat()
+                            if row.range_start
+                            else None,
+                            "range_end": row.range_end.isoformat()
+                            if row.range_end
+                            else None,
+                            "is_compressed": row.is_compressed,
+                            "size": row.size,
+                            "size_bytes": row.size_bytes,
+                        }
+                    )
+
                 return chunks
             finally:
                 if not session:
@@ -398,4 +407,3 @@ class CompressionManager:
 
 # Global instance
 compression_manager = CompressionManager()
-

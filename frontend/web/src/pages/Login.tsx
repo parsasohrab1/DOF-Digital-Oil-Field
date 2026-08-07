@@ -1,44 +1,39 @@
 import { FormEvent, useState } from 'react'
-import { useLocation, useNavigate, Navigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { Navigate } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
 import './Login.css'
 
 export default function Login() {
-  const { login, isAuthenticated } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
+  const { isAuthenticated, login } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   if (isAuthenticated) {
-    const redirectTo = (location.state as { from?: string })?.from || '/'
-    return <Navigate to={redirectTo} replace />
+    return <Navigate to="/" replace />
   }
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault()
-    setError(null)
-    setIsSubmitting(true)
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
     try {
       await login(username, password)
-      const redirectTo = (location.state as { from?: string })?.from || '/'
-      navigate(redirectTo, { replace: true })
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Invalid username or password')
+      setError(err?.response?.data?.detail || 'ورود ناموفق بود')
     } finally {
-      setIsSubmitting(false)
+      setLoading(false)
     }
   }
 
   return (
-    <div className="login-page">
+    <div className="login-page" dir="rtl">
       <form className="login-card" onSubmit={handleSubmit}>
-        <h1>OGIM</h1>
-        <p className="login-subtitle">Oil &amp; Gas Intelligent Monitoring</p>
+        <h1>هوشمندسازی میادین نفت و گاز</h1>
+        <p className="login-subtitle">میدان دهلران · شرکت ملی نفت مناطق مرکزی</p>
 
-        <label htmlFor="username">Username</label>
+        <label htmlFor="username">نام کاربری</label>
         <input
           id="username"
           type="text"
@@ -48,7 +43,7 @@ export default function Login() {
           required
         />
 
-        <label htmlFor="password">Password</label>
+        <label htmlFor="password">رمز عبور</label>
         <input
           id="password"
           type="password"
@@ -58,10 +53,10 @@ export default function Login() {
           required
         />
 
-        {error && <div className="login-error">{error}</div>}
+        {error && <p className="login-error">{error}</p>}
 
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Signing in...' : 'Sign in'}
+        <button type="submit" disabled={loading}>
+          {loading ? 'در حال ورود…' : 'ورود'}
         </button>
       </form>
     </div>

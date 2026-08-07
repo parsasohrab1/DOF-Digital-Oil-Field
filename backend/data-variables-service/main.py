@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 # Add backend directory to path
-backend_dir = os.path.join(os.path.dirname(__file__), '..')
+backend_dir = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, backend_dir)
 
 from shared.config import settings
@@ -24,7 +24,7 @@ from shared.data_variables import (
     get_variables_by_sampling_rate,
     get_all_variables,
     get_variable_by_name,
-    DataCategory
+    DataCategory,
 )
 from shared.database import get_timescale_db
 from shared.models import SensorData
@@ -48,9 +48,7 @@ app.add_middleware(
 
 
 @app.get("/")
-async def get_all_variables_endpoint(
-    _: dict = Depends(require_authentication)
-):
+async def get_all_variables_endpoint(_: dict = Depends(require_authentication)):
     """Get all data variables"""
     variables = get_all_variables()
     return [
@@ -62,7 +60,7 @@ async def get_all_variables_endpoint(
             "valid_range_min": v.valid_range_min,
             "valid_range_max": v.valid_range_max,
             "description": v.description,
-            "equipment_location": v.equipment_location
+            "equipment_location": v.equipment_location,
         }
         for v in variables
     ]
@@ -70,15 +68,14 @@ async def get_all_variables_endpoint(
 
 @app.get("/category/{category}")
 async def get_variables_by_category_endpoint(
-    category: str,
-    _: dict = Depends(require_authentication)
+    category: str, _: dict = Depends(require_authentication)
 ):
     """Get variables by category"""
     try:
         data_category = DataCategory(category.lower())
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid category: {category}")
-    
+
     variables = get_variables_by_category(data_category)
     return [
         {
@@ -89,7 +86,7 @@ async def get_variables_by_category_endpoint(
             "valid_range_min": v.valid_range_min,
             "valid_range_max": v.valid_range_max,
             "description": v.description,
-            "equipment_location": v.equipment_location
+            "equipment_location": v.equipment_location,
         }
         for v in variables
     ]
@@ -97,8 +94,7 @@ async def get_variables_by_category_endpoint(
 
 @app.get("/sampling-rate/{rate_ms}")
 async def get_variables_by_sampling_rate_endpoint(
-    rate_ms: int,
-    _: dict = Depends(require_authentication)
+    rate_ms: int, _: dict = Depends(require_authentication)
 ):
     """Get variables by sampling rate"""
     variables = get_variables_by_sampling_rate(rate_ms)
@@ -111,7 +107,7 @@ async def get_variables_by_sampling_rate_endpoint(
             "valid_range_min": v.valid_range_min,
             "valid_range_max": v.valid_range_max,
             "description": v.description,
-            "equipment_location": v.equipment_location
+            "equipment_location": v.equipment_location,
         }
         for v in variables
     ]
@@ -122,24 +118,30 @@ async def get_variable_data(
     variable_name: str,
     limit: int = 100,
     tsdb: Session = Depends(get_timescale_db),
-    _: dict = Depends(require_authentication)
+    _: dict = Depends(require_authentication),
 ):
     """Get real-time data for a variable"""
     # Find variable
     variable = get_variable_by_name(variable_name)
     if not variable:
-        raise HTTPException(status_code=404, detail=f"Variable not found: {variable_name}")
-    
+        raise HTTPException(
+            status_code=404, detail=f"Variable not found: {variable_name}"
+        )
+
     # Get sensor data (assuming tag_id matches variable name)
-    data = tsdb.query(SensorData).filter(
-        SensorData.tag_id.like(f"%{variable_name}%")
-    ).order_by(SensorData.timestamp.desc()).limit(limit).all()
-    
+    data = (
+        tsdb.query(SensorData)
+        .filter(SensorData.tag_id.like(f"%{variable_name}%"))
+        .order_by(SensorData.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+
     return [
         {
             "timestamp": d.timestamp.isoformat(),
             "value": d.value,
-            "data_quality": d.data_quality
+            "data_quality": d.data_quality,
         }
         for d in reversed(data)  # Reverse to show chronological order
     ]
@@ -151,10 +153,9 @@ async def health():
     return {
         "status": "healthy",
         "service": "data-variables",
-        "total_variables": len(DATA_VARIABLES)
+        "total_variables": len(DATA_VARIABLES),
     }
 
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8013)
-

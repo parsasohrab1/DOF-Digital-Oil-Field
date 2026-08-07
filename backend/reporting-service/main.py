@@ -113,7 +113,9 @@ def _safe_stats(values: List[float]) -> Dict[str, float]:
     }
 
 
-async def _fetch_sensor_data(limit: int = 500, well_name: Optional[str] = None) -> List[Dict[str, Any]]:
+async def _fetch_sensor_data(
+    limit: int = 500, well_name: Optional[str] = None
+) -> List[Dict[str, Any]]:
     cache_key = f"{well_name or 'all'}:{limit}"
     cached = _sensor_data_cache.get(cache_key)
     now_ts = time.time()
@@ -137,14 +139,18 @@ async def _fetch_sensor_data(limit: int = 500, well_name: Optional[str] = None) 
         return records
 
 
-def _build_data_quality_metrics(records: List[Dict[str, Any]], lookback_hours: int) -> Dict[str, Any]:
+def _build_data_quality_metrics(
+    records: List[Dict[str, Any]], lookback_hours: int
+) -> Dict[str, Any]:
     now = datetime.utcnow()
     horizon = now - timedelta(hours=max(1, lookback_hours))
 
     scoped = []
     for rec in records:
         try:
-            ts = datetime.fromisoformat(str(rec.get("timestamp")).replace("Z", "+00:00")).replace(tzinfo=None)
+            ts = datetime.fromisoformat(
+                str(rec.get("timestamp")).replace("Z", "+00:00")
+            ).replace(tzinfo=None)
             if ts >= horizon:
                 scoped.append(rec)
         except Exception:
@@ -212,7 +218,9 @@ def _build_data_quality_metrics(records: List[Dict[str, Any]], lookback_hours: i
     timeliness = timely_count / total
     consistency = max(0.0, 1 - (consistency_violations / max(1, len(values_by_sensor))))
     duplicate_penalty = max(0.0, 1 - (duplicates / total))
-    overall = (completeness + validity + timeliness + consistency + duplicate_penalty) / 5
+    overall = (
+        completeness + validity + timeliness + consistency + duplicate_penalty
+    ) / 5
 
     return {
         "overall_score": round(overall, 3),
@@ -257,7 +265,9 @@ def _build_lineage(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     return {"nodes": nodes, "edges": edges}
 
 
-def _apply_filters(records: List[Dict[str, Any]], filters: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _apply_filters(
+    records: List[Dict[str, Any]], filters: Dict[str, Any]
+) -> List[Dict[str, Any]]:
     if not filters:
         return records
 
@@ -283,7 +293,13 @@ def _run_report_builder_query(
         dim_values = {d: rec.get(d) for d in dimensions}
         key = "|".join([str(dim_values[d]) for d in dimensions])
         if key not in groups:
-            groups[key] = {**dim_values, "_count": 0, "_sum": 0.0, "_min": None, "_max": None}
+            groups[key] = {
+                **dim_values,
+                "_count": 0,
+                "_sum": 0.0,
+                "_min": None,
+                "_max": None,
+            }
 
         item = groups[key]
         item["_count"] += 1
@@ -335,7 +351,9 @@ async def _execute_step(step: WorkflowStep, context: Dict[str, Any]) -> Dict[str
             return {
                 "status_code": response.status_code,
                 "ok": response.is_success,
-                "body": response.json() if "application/json" in response.headers.get("content-type", "") else response.text,
+                "body": response.json()
+                if "application/json" in response.headers.get("content-type", "")
+                else response.text,
             }
 
     if step_type == "generate_report":
@@ -359,7 +377,11 @@ async def _execute_step(step: WorkflowStep, context: Dict[str, Any]) -> Dict[str
     raise ValueError(f"Unsupported step type: {step_type}")
 
 
-async def _run_workflow(workflow: Dict[str, Any], trigger: str, trigger_input: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def _run_workflow(
+    workflow: Dict[str, Any],
+    trigger: str,
+    trigger_input: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     run_id = f"WFR-{datetime.utcnow().strftime('%Y%m%d-%H%M%S-%f')}"
     steps = [WorkflowStep(**s) for s in workflow.get("steps", [])]
     status = "success"
@@ -410,7 +432,11 @@ async def _workflow_scheduler_loop():
                 if not every:
                     continue
                 last = wf.get("_last_scheduled_run_ts")
-                should_run = last is None or (now - datetime.fromisoformat(last)).total_seconds() >= int(every) * 60
+                should_run = (
+                    last is None
+                    or (now - datetime.fromisoformat(last)).total_seconds()
+                    >= int(every) * 60
+                )
                 if should_run:
                     wf["_last_scheduled_run_ts"] = now.isoformat()
                     await _run_workflow(wf, trigger="schedule")
@@ -447,7 +473,11 @@ async def generate_report(request: ReportRequest):
     REPORT_GENERATION_DURATION.observe(duration)
     logger.info(
         "Report generated",
-        extra={"report_id": report_id, "report_type": request.report_type, "duration": duration},
+        extra={
+            "report_id": report_id,
+            "report_type": request.report_type,
+            "duration": duration,
+        },
     )
     return report
 
@@ -476,13 +506,19 @@ async def run_report_builder(request: ReportBuilderRequest):
     invalid_dims = [d for d in request.dimensions if d not in SUPPORTED_DIMENSIONS]
     invalid_measures = [m for m in request.measures if m not in SUPPORTED_MEASURES]
     if invalid_dims:
-        raise HTTPException(status_code=400, detail=f"Unsupported dimensions: {invalid_dims}")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported dimensions: {invalid_dims}"
+        )
     if invalid_measures:
-        raise HTTPException(status_code=400, detail=f"Unsupported measures: {invalid_measures}")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported measures: {invalid_measures}"
+        )
 
     records = await _fetch_sensor_data(limit=2000, well_name=request.well_name)
     records = _apply_filters(records, request.filters)
-    rows = _run_report_builder_query(records, request.dimensions, request.measures, request.limit)
+    rows = _run_report_builder_query(
+        records, request.dimensions, request.measures, request.limit
+    )
     report_id = f"BI-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     report = {
         "report_id": report_id,
@@ -650,7 +686,12 @@ async def list_workflow_templates():
                 "description": "Generate DQ + lineage report every 24 hours",
                 "schedule_minutes": 1440,
                 "steps": [
-                    {"id": "dq", "type": "data_quality_lineage", "config": {"lookback_hours": 24}, "depends_on": []},
+                    {
+                        "id": "dq",
+                        "type": "data_quality_lineage",
+                        "config": {"lookback_hours": 24},
+                        "depends_on": [],
+                    },
                 ],
             },
             {
@@ -659,8 +700,24 @@ async def list_workflow_templates():
                 "description": "Ping reporting and alert services",
                 "schedule_minutes": 60,
                 "steps": [
-                    {"id": "reporting_health", "type": "http_request", "config": {"method": "GET", "url": "http://reporting-service:8005/health"}, "depends_on": []},
-                    {"id": "alert_health", "type": "http_request", "config": {"method": "GET", "url": "http://alert-service:8004/health"}, "depends_on": ["reporting_health"]},
+                    {
+                        "id": "reporting_health",
+                        "type": "http_request",
+                        "config": {
+                            "method": "GET",
+                            "url": "http://reporting-service:8005/health",
+                        },
+                        "depends_on": [],
+                    },
+                    {
+                        "id": "alert_health",
+                        "type": "http_request",
+                        "config": {
+                            "method": "GET",
+                            "url": "http://alert-service:8004/health",
+                        },
+                        "depends_on": ["reporting_health"],
+                    },
                 ],
             },
             {
@@ -669,8 +726,18 @@ async def list_workflow_templates():
                 "description": "Generate weekly report then DQ validation",
                 "schedule_minutes": 10080,
                 "steps": [
-                    {"id": "report", "type": "generate_report", "config": {"report_type": "weekly"}, "depends_on": []},
-                    {"id": "dq", "type": "data_quality_lineage", "config": {"lookback_hours": 168}, "depends_on": ["report"]},
+                    {
+                        "id": "report",
+                        "type": "generate_report",
+                        "config": {"report_type": "weekly"},
+                        "depends_on": [],
+                    },
+                    {
+                        "id": "dq",
+                        "type": "data_quality_lineage",
+                        "config": {"lookback_hours": 168},
+                        "depends_on": ["report"],
+                    },
                 ],
             },
         ]
@@ -719,12 +786,18 @@ async def get_visual_builder_step_types():
             {
                 "type": "generate_report",
                 "label": "Generate Standard Report",
-                "config_schema": {"report_type": "daily|weekly|monthly|custom", "well_name": "string(optional)"},
+                "config_schema": {
+                    "report_type": "daily|weekly|monthly|custom",
+                    "well_name": "string(optional)",
+                },
             },
             {
                 "type": "data_quality_lineage",
                 "label": "Generate DQ + Lineage",
-                "config_schema": {"well_name": "string(optional)", "lookback_hours": "integer"},
+                "config_schema": {
+                    "well_name": "string(optional)",
+                    "lookback_hours": "integer",
+                },
             },
         ]
     }
@@ -753,4 +826,3 @@ async def workflow_shutdown():
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8005)
-

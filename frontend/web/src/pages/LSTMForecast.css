@@ -4,7 +4,7 @@
 
 .lstm-forecast-page h2 {
   margin-bottom: 20px;
-  color: #333;
+  color: #111111;
 }
 
 .lstm-grid {
@@ -23,7 +23,7 @@
 .lstm-card h3 {
   margin-top: 0;
   color: #555;
-  border-bottom: 2px solid #eee;
+  border-bottom: 2px solid #e0e0e0;
   padding-bottom: 10px;
 }
 
@@ -43,7 +43,7 @@
 .form-group textarea {
   width: 100%;
   padding: 8px;
-  border: 1px solid #ddd;
+  border: 1px solid #e0e0e0;
   border-radius: 4px;
   font-size: 14px;
 }
@@ -81,7 +81,7 @@
 
 .btn-train:disabled,
 .btn-forecast:disabled {
-  background: #ccc;
+  background: #f5f5f5;
   cursor: not-allowed;
 }
 
@@ -94,7 +94,7 @@
 
 .training-results h4 {
   margin-top: 0;
-  color: #333;
+  color: #111111;
 }
 
 .models-list {
@@ -112,7 +112,7 @@
 
 .model-name {
   font-weight: 600;
-  color: #333;
+  color: #111111;
   margin-bottom: 5px;
 }
 
@@ -125,7 +125,7 @@
 
 .model-info {
   font-size: 12px;
-  color: #999;
+  color: #555555;
 }
 
 .no-models {
@@ -159,7 +159,7 @@
 
 .predictions-list h4 {
   margin-bottom: 15px;
-  color: #333;
+  color: #111111;
 }
 
 .predictions-grid {
@@ -190,6 +190,6 @@
 
 .pred-range {
   font-size: 10px;
-  color: #999;
+  color: #555555;
 }
 

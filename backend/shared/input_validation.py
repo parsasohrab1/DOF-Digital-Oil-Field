@@ -11,7 +11,10 @@ XSS_PATTERNS: List[Pattern[str]] = [
 ]
 
 SQLI_PATTERNS: List[Pattern[str]] = [
-    re.compile(r"(\bunion\b\s+\bselect\b|\bdrop\b\s+\btable\b|\binsert\b\s+\binto\b)", re.IGNORECASE),
+    re.compile(
+        r"(\bunion\b\s+\bselect\b|\bdrop\b\s+\btable\b|\binsert\b\s+\binto\b)",
+        re.IGNORECASE,
+    ),
     re.compile(r"(\bor\b\s+1\s*=\s*1\b|\band\b\s+1\s*=\s*1\b)", re.IGNORECASE),
     re.compile(r"(--|/\*|\*/|;\s*shutdown\b|xp_cmdshell)", re.IGNORECASE),
 ]
@@ -19,7 +22,9 @@ SQLI_PATTERNS: List[Pattern[str]] = [
 SUSPICIOUS_INPUT_PATTERNS: List[Pattern[str]] = XSS_PATTERNS + SQLI_PATTERNS
 
 
-def contains_suspicious_content(value: str, patterns: Iterable[Pattern[str]] = None) -> bool:
+def contains_suspicious_content(
+    value: str, patterns: Iterable[Pattern[str]] = None
+) -> bool:
     if not value:
         return False
     active = patterns if patterns is not None else SUSPICIOUS_INPUT_PATTERNS
@@ -45,6 +50,8 @@ def validate_query_params(params: dict, *, max_length: int = 1024) -> List[str]:
     for key, value in params.items():
         if len(str(key)) > max_length or len(str(value)) > max_length:
             errors.append("parameter_length_exceeded")
-        if contains_suspicious_content(str(key)) or contains_suspicious_content(str(value)):
+        if contains_suspicious_content(str(key)) or contains_suspicious_content(
+            str(value)
+        ):
             errors.append("suspicious_query_param")
     return errors

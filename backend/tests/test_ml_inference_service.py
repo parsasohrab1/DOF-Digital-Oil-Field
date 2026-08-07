@@ -52,13 +52,16 @@ def client():
     reason="mlflow package not installed in this environment",
 )
 class TestDriftDetection:
-    def test_baseline_rejects_a_single_flat_dict(self, client):
-        """Regression guard for the exact shape the frontend used to send."""
+    def test_baseline_normalizes_a_single_flat_dict(self, client):
+        """A field_validator now normalizes a single {"feature": value} dict
+        into a one-sample batch instead of 422ing on it (defense in depth
+        alongside the frontend always sending an array)."""
         response = client.post(
             "/models/anomaly_detection/drift/baseline",
             json={"features": {"pressure": 318, "temperature": 84}},
         )
-        assert response.status_code == 422
+        assert response.status_code == 200
+        assert response.json()["baseline"]["sample_size"] == 1
 
     def test_baseline_and_detect_full_cycle(self, client):
         baseline_response = client.post(

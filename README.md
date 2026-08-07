@@ -1,4 +1,4 @@
-# **Software Requirements Specification (SRS) - OGIM: Oil & Gas Intelligent Monitoring System**
+# **Software Requirements Specification (SRS) - SOGF: Smartening Oil & Gas Fields**
 **Version:** 2.0 | **Date:** November 2025 | **Status:** FINAL
 
 ---
@@ -6,10 +6,10 @@
 ## **1. Introduction**
 
 ### **1.1 Purpose**
-This document specifies the complete software requirements for the **Oil & Gas Intelligent Monitoring (OGIM) System** - a comprehensive real-time monitoring, predictive analytics, and control platform for oil and gas field operations.
+This document specifies the complete software requirements for **SOGF - Smartening Oil & Gas Fields** - a comprehensive real-time monitoring, predictive analytics, and control platform for oil and gas field operations.
 
 ### **1.2 Scope**
-OGIM provides end-to-end digital transformation for oil field operations including real-time monitoring, machine learning-driven predictive maintenance, intelligent alerting, and secure command/control capabilities.
+SOGF provides end-to-end digital transformation for oil field operations including real-time monitoring, machine learning-driven predictive maintenance, intelligent alerting, and secure command/control capabilities.
 
 ### **1.3 Business Objectives**
 - Reduce unplanned downtime by 40%

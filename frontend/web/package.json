@@ -1,11 +1,14 @@
 {
-  "name": "ogim-web-portal",
+  "name": "sogf-web-portal",
   "version": "1.0.0",
-  "description": "Oil & Gas Intelligent Monitoring Web Portal",
+  "description": "SOGF - Smartening Oil & Gas Fields Web Portal",
   "scripts": {
     "dev": "vite",
+    "dev:offline": "vite --mode offline --host 127.0.0.1 --port 3000",
     "build": "tsc && vite build",
+    "build:offline": "tsc && vite build --mode offline",
     "preview": "vite preview",
+    "preview:offline": "vite preview --host 127.0.0.1 --port 3000",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {

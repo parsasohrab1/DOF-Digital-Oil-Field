@@ -38,7 +38,9 @@ class SIEMEventLogger:
             except Exception as exc:
                 logger.error("Failed to write SIEM event file: %s", exc)
 
-    def recent_events(self, limit: int = 50, severity: Optional[str] = None) -> List[Dict[str, Any]]:
+    def recent_events(
+        self, limit: int = 50, severity: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         events = list(self._events)
         if severity:
             events = [e for e in events if e.get("severity") == severity]
@@ -51,7 +53,8 @@ class SIEMEventLogger:
         return {
             "total_buffered": len(self._events),
             "by_severity": dict(counts),
-            "zero_trust_enforced": os.getenv("ZERO_TRUST_ENFORCED", "false").lower() == "true",
+            "zero_trust_enforced": os.getenv("ZERO_TRUST_ENFORCED", "false").lower()
+            == "true",
             "threat_block_threshold": int(os.getenv("THREAT_BLOCK_THRESHOLD", "70")),
         }
 
@@ -87,7 +90,9 @@ class ThreatDetector:
             reasons.append("high_request_rate_ip")
 
         if user:
-            self._user_hits[user] = [t for t in self._user_hits[user] if now - t < self.window]
+            self._user_hits[user] = [
+                t for t in self._user_hits[user] if now - t < self.window
+            ]
             self._user_hits[user].append(now)
             if len(self._user_hits[user]) > self.max_user_hits:
                 risk += 35
@@ -118,4 +123,3 @@ def is_private_or_loopback(ip: str) -> bool:
 
 siem_logger = SIEMEventLogger()
 threat_detector = ThreatDetector()
-

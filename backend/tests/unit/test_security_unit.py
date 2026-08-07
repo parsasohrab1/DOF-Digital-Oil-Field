@@ -77,7 +77,9 @@ def test_decode_token_rejects_expired_token():
 
 @pytest.mark.unit
 def test_access_token_accepts_custom_expiry_delta():
-    token = create_access_token({"sub": "delta-user"}, expires_delta=timedelta(minutes=3))
+    token = create_access_token(
+        {"sub": "delta-user"}, expires_delta=timedelta(minutes=3)
+    )
     payload = decode_token(token)
     assert payload["type"] == "access"
 
@@ -94,4 +96,3 @@ def test_2fa_helpers_and_api_key():
     api_key = generate_api_key()
     assert isinstance(api_key, str)
     assert len(api_key) > 20
-

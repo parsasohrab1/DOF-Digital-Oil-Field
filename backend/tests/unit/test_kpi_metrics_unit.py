@@ -49,3 +49,17 @@ def test_false_positive_rate():
     summary = kpi_metrics.get_executive_summary()
     assert summary["alert_quality"]["false_positive_rate"] == 0.5
     assert summary["alert_quality"]["alerts_total"] == 2
+
+
+@pytest.mark.unit
+def test_latency_sample_trimming():
+    for i in range(510):
+        kpi_metrics.record_latency("api-gateway", 0.001 + (i % 10) * 0.001)
+    assert len(kpi_metrics._kpi_state["latency_samples_ms"]) <= 500
+    summary = kpi_metrics.get_executive_summary()
+    assert summary["latency"]["p95_ms"] is not None
+
+
+@pytest.mark.unit
+def test_empty_percentile_returns_none():
+    assert kpi_metrics._percentile([], 0.95) is None

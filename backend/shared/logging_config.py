@@ -71,4 +71,3 @@ class LoggerAdapter(logging.LoggerAdapter):
         extra.update(self.extra or {})
         kwargs["extra"] = extra
         return msg, kwargs
-

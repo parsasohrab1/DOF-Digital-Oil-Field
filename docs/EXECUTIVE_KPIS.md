@@ -36,4 +36,10 @@
 ```bash
 curl http://localhost:8000/kpi/summary
 curl http://localhost:8000/kpi/cache-stats
+curl -X POST http://localhost:8000/kpi/feature-usage -H "Content-Type: application/json" -d "{\"feature\":\"dashboard\"}"
+curl -X POST http://localhost:8000/kpi/cache/invalidate -H "Content-Type: application/json" -d "{}"
 ```
+
+Web UI صفحه **APM** (`/performance`) adoption را از مسیرهای بازدیدشده (Layout → `feature-usage`) نیز تغذیه می‌کند.
+
+جزئیات hardening: [PHASE3_HARDENING.md](PHASE3_HARDENING.md)

@@ -46,6 +46,7 @@ app.add_middleware(
 
 class CompressionPolicyRequest(BaseModel):
     """Compression policy request"""
+
     table_name: str
     compress_after_days: int = Field(default=90, ge=1, le=365)
     segmentby_column: Optional[str] = None
@@ -54,6 +55,7 @@ class CompressionPolicyRequest(BaseModel):
 
 class RetentionPolicyRequest(BaseModel):
     """Retention policy request"""
+
     table_name: str
     drop_after_days: int = Field(default=365, ge=1)
     cascade: bool = False
@@ -61,6 +63,7 @@ class RetentionPolicyRequest(BaseModel):
 
 class PartitioningConfig(BaseModel):
     """Partitioning configuration"""
+
     table_name: str
     chunk_time_interval: str = "1 day"
     number_partitions: Optional[int] = None
@@ -69,6 +72,7 @@ class PartitioningConfig(BaseModel):
 
 class StorageStats(BaseModel):
     """Storage statistics"""
+
     table_name: str
     total_size: str
     compressed_size: str
@@ -85,31 +89,31 @@ class StorageStats(BaseModel):
 async def enable_compression(
     request: CompressionPolicyRequest,
     tsdb: Session = Depends(get_timescale_db),
-    _: Dict[str, Any] = Depends(require_roles({"system_admin", "data_engineer"}))
+    _: Dict[str, Any] = Depends(require_roles({"system_admin", "data_engineer"})),
 ):
     """Enable compression on a hypertable"""
     success = compression_manager.enable_compression(
         table_name=request.table_name,
         segmentby_column=request.segmentby_column,
         orderby_column=request.orderby_column,
-        session=tsdb
+        session=tsdb,
     )
-    
+
     if not success:
         raise HTTPException(status_code=500, detail="Failed to enable compression")
-    
+
     # Add compression policy
     policy_success = compression_manager.add_compression_policy(
         table_name=request.table_name,
         compress_after_days=request.compress_after_days,
-        session=tsdb
+        session=tsdb,
     )
-    
+
     return {
         "status": "success",
         "message": f"Compression enabled for {request.table_name}",
         "compress_after_days": request.compress_after_days,
-        "policy_added": policy_success
+        "policy_added": policy_success,
     }
 
 
@@ -117,25 +121,25 @@ async def enable_compression(
 async def get_compression_status(
     table_name: str,
     tsdb: Session = Depends(get_timescale_db),
-    _: Dict[str, Any] = Depends(require_authentication)
+    _: Dict[str, Any] = Depends(require_authentication),
 ):
     """Get compression status for a hypertable"""
     status = compression_manager.get_compression_status(table_name, session=tsdb)
-    
+
     if "error" in status:
         raise HTTPException(status_code=404, detail=status["error"])
-    
+
     # Get chunk date range
     chunks = compression_manager.get_chunk_statistics(table_name, session=tsdb)
     oldest_date = None
     newest_date = None
-    
+
     if chunks:
         dates = [c["range_start"] for c in chunks if c["range_start"]]
         if dates:
             oldest_date = min(dates)
             newest_date = max(dates)
-    
+
     return StorageStats(
         table_name=status["hypertable_name"],
         total_size=status["total_size"],
@@ -146,7 +150,7 @@ async def get_compression_status(
         compressed_chunks=status["compressed_chunks"],
         uncompressed_chunks=status["uncompressed_chunks"],
         oldest_chunk_date=oldest_date,
-        newest_chunk_date=newest_date
+        newest_chunk_date=newest_date,
     )
 
 
@@ -155,18 +159,16 @@ async def compress_chunks_now(
     table_name: str,
     older_than_days: int = 90,
     tsdb: Session = Depends(get_timescale_db),
-    _: Dict[str, Any] = Depends(require_roles({"system_admin", "data_engineer"}))
+    _: Dict[str, Any] = Depends(require_roles({"system_admin", "data_engineer"})),
 ):
     """Manually compress chunks older than specified days"""
     result = compression_manager.compress_chunks_manually(
-        table_name=table_name,
-        older_than_days=older_than_days,
-        session=tsdb
+        table_name=table_name, older_than_days=older_than_days, session=tsdb
     )
-    
+
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
-    
+
     return result
 
 
@@ -174,7 +176,7 @@ async def compress_chunks_now(
 async def add_retention_policy(
     request: RetentionPolicyRequest,
     tsdb: Session = Depends(get_timescale_db),
-    _: Dict[str, Any] = Depends(require_roles({"system_admin"}))
+    _: Dict[str, Any] = Depends(require_roles({"system_admin"})),
 ):
     """Add retention policy to drop old chunks"""
     try:
@@ -187,13 +189,16 @@ async def add_retention_policy(
                 if_not_exists => true
             );
         """
-        conn.execute(text(query), {"table_name": table_name, "drop_after_days": request.drop_after_days})
+        conn.execute(
+            text(query),
+            {"table_name": table_name, "drop_after_days": request.drop_after_days},
+        )
         conn.commit()
-        
+
         return {
             "status": "success",
             "message": f"Retention policy added for {request.table_name}",
-            "drop_after_days": request.drop_after_days
+            "drop_after_days": request.drop_after_days,
         }
     except Exception as e:
         logger.error(f"Failed to add retention policy: {e}")
@@ -204,7 +209,7 @@ async def add_retention_policy(
 async def get_partitioning_config(
     table_name: str,
     tsdb: Session = Depends(get_timescale_db),
-    _: Dict[str, Any] = Depends(require_authentication)
+    _: Dict[str, Any] = Depends(require_authentication),
 ):
     """Get partitioning configuration for a hypertable"""
     try:
@@ -223,7 +228,9 @@ async def get_partitioning_config(
         row = result.fetchone()
 
         if not row:
-            raise HTTPException(status_code=404, detail=f"Hypertable {table_name} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Hypertable {table_name} not found"
+            )
 
         # Get chunk interval
         chunk_query = """
@@ -238,19 +245,23 @@ async def get_partitioning_config(
         chunk_result = conn.execute(text(chunk_query), {"table_name": table_name})
         dimensions = []
         for dim_row in chunk_result:
-            dimensions.append({
-                "type": dim_row.dimension_type,
-                "time_interval": str(dim_row.time_interval) if dim_row.time_interval else None,
-                "integer_interval": dim_row.integer_interval
-            })
-        
+            dimensions.append(
+                {
+                    "type": dim_row.dimension_type,
+                    "time_interval": str(dim_row.time_interval)
+                    if dim_row.time_interval
+                    else None,
+                    "integer_interval": dim_row.integer_interval,
+                }
+            )
+
         return {
             "hypertable_name": row.hypertable_name,
             "num_dimensions": row.num_dimensions,
             "num_chunks": row.num_chunks,
             "compression_enabled": row.compression_enabled,
             "is_distributed": row.is_distributed,
-            "dimensions": dimensions
+            "dimensions": dimensions,
         }
     except Exception as e:
         logger.error(f"Failed to get partitioning config: {e}")
@@ -261,7 +272,7 @@ async def get_partitioning_config(
 async def optimize_partitioning(
     config: PartitioningConfig,
     tsdb: Session = Depends(get_timescale_db),
-    _: Dict[str, Any] = Depends(require_roles({"system_admin", "data_engineer"}))
+    _: Dict[str, Any] = Depends(require_roles({"system_admin", "data_engineer"})),
 ):
     """Optimize partitioning configuration"""
     try:
@@ -277,11 +288,11 @@ async def optimize_partitioning(
         """
         conn.execute(text(query), {"table_name": config.table_name})
         conn.commit()
-        
+
         return {
             "status": "success",
             "message": f"Partitioning optimized for {config.table_name}",
-            "chunk_time_interval": config.chunk_time_interval
+            "chunk_time_interval": config.chunk_time_interval,
         }
     except Exception as e:
         logger.error(f"Failed to optimize partitioning: {e}")
@@ -293,20 +304,17 @@ async def get_chunks(
     table_name: str,
     limit: int = 100,
     tsdb: Session = Depends(get_timescale_db),
-    _: Dict[str, Any] = Depends(require_authentication)
+    _: Dict[str, Any] = Depends(require_authentication),
 ):
     """Get chunk statistics for a hypertable"""
     chunks = compression_manager.get_chunk_statistics(table_name, session=tsdb)
-    return {
-        "chunks": chunks[:limit],
-        "total": len(chunks)
-    }
+    return {"chunks": chunks[:limit], "total": len(chunks)}
 
 
 @app.get("/cluster/status")
 async def get_cluster_status(
     tsdb: Session = Depends(get_timescale_db),
-    _: Dict[str, Any] = Depends(require_authentication)
+    _: Dict[str, Any] = Depends(require_authentication),
 ):
     """Get cluster status and statistics"""
     status = cluster_manager.get_cluster_status(session=tsdb)
@@ -316,12 +324,12 @@ async def get_cluster_status(
 @app.get("/storage/stats")
 async def get_storage_stats(
     tsdb: Session = Depends(get_timescale_db),
-    _: Dict[str, Any] = Depends(require_authentication)
+    _: Dict[str, Any] = Depends(require_authentication),
 ):
     """Get overall storage statistics"""
     try:
         conn = tsdb.connection()
-        
+
         # Get all hypertables
         query = """
             SELECT hypertable_name
@@ -329,25 +337,29 @@ async def get_storage_stats(
         """
         result = conn.execute(text(query))
         hypertables = [row.hypertable_name for row in result]
-        
+
         stats = []
         for table_name in hypertables:
-            status = compression_manager.get_compression_status(table_name, session=tsdb)
+            status = compression_manager.get_compression_status(
+                table_name, session=tsdb
+            )
             if "error" not in status:
                 stats.append(status)
-        
+
         # Calculate totals
         total_chunks = sum(s.get("total_chunks", 0) for s in stats)
         compressed_chunks = sum(s.get("compressed_chunks", 0) for s in stats)
-        
+
         return {
             "hypertables": stats,
             "summary": {
                 "total_hypertables": len(stats),
                 "total_chunks": total_chunks,
                 "compressed_chunks": compressed_chunks,
-                "compression_rate": (compressed_chunks / total_chunks * 100) if total_chunks > 0 else 0
-            }
+                "compression_rate": (compressed_chunks / total_chunks * 100)
+                if total_chunks > 0
+                else 0,
+            },
         }
     except Exception as e:
         logger.error(f"Failed to get storage stats: {e}")
@@ -357,12 +369,8 @@ async def get_storage_stats(
 @app.get("/health")
 async def health():
     """Health check"""
-    return {
-        "status": "healthy",
-        "service": "storage-optimization"
-    }
+    return {"status": "healthy", "service": "storage-optimization"}
 
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8014)
-

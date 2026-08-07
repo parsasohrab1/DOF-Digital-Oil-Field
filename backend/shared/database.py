@@ -16,13 +16,11 @@ logger = logging.getLogger(__name__)
 
 # Database URLs from environment variables
 DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://ogim_user:ogim_password@postgres:5432/ogim"
+    "DATABASE_URL", "postgresql://ogim_user:ogim_password@postgres:5432/ogim"
 )
 
 TIMESCALE_URL = os.getenv(
-    "TIMESCALE_URL",
-    "postgresql://ogim_user:ogim_password@timescaledb:5432/ogim_tsdb"
+    "TIMESCALE_URL", "postgresql://ogim_user:ogim_password@timescaledb:5432/ogim_tsdb"
 )
 
 # Create engines
@@ -33,20 +31,22 @@ engine = create_engine(
     pool_pre_ping=True,
     pool_recycle=settings.DATABASE_POOL_RECYCLE_SECONDS,
     pool_timeout=settings.DATABASE_POOL_TIMEOUT_SECONDS,
-    echo=False
+    echo=False,
 )
 
 
 def get_timescale_connection_url() -> str:
     """
     Get TimescaleDB connection URL with load balancing for multi-node setup
-    
+
     Returns:
         Connection URL (load balanced if multi-node enabled)
     """
     if settings.TIMESCALE_MULTI_NODE_ENABLED and settings.TIMESCALE_ACCESS_NODES:
         # Load balance across access nodes
-        access_nodes = [node.strip() for node in settings.TIMESCALE_ACCESS_NODES.split(",")]
+        access_nodes = [
+            node.strip() for node in settings.TIMESCALE_ACCESS_NODES.split(",")
+        ]
         if access_nodes:
             # Random selection for load balancing
             selected_node = random.choice(access_nodes)
@@ -63,7 +63,7 @@ def get_timescale_connection_url() -> str:
                         new_url = f"{auth_part}@{selected_node}/{db_part}"
                         logger.debug(f"Using TimescaleDB access node: {selected_node}")
                         return new_url
-    
+
     return TIMESCALE_URL
 
 
@@ -77,15 +77,14 @@ timescale_engine = create_engine(
     pool_timeout=settings.DATABASE_POOL_TIMEOUT_SECONDS,
     echo=False,
     # Optimize for high-volume writes
-    connect_args={
-        "connect_timeout": 10,
-        "application_name": "ogim_timescale_client"
-    }
+    connect_args={"connect_timeout": 10, "application_name": "ogim_timescale_client"},
 )
 
 # Create session factories
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-TimescaleSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=timescale_engine)
+TimescaleSessionLocal = sessionmaker(
+    autocommit=False, autoflush=False, bind=timescale_engine
+)
 
 # Create base class for models
 Base = declarative_base()
@@ -131,4 +130,3 @@ def init_db():
 def init_timescale_db():
     """Initialize TimescaleDB tables"""
     Base.metadata.create_all(bind=timescale_engine)
-

@@ -18,6 +18,7 @@
 - **[DEVELOPER_GUIDE](DEVELOPER_GUIDE.md)** - راهنمای توسعه‌دهنده و گردش کار
 - **[USER_GUIDE](USER_GUIDE.md)** - راهنمای کاربر نهایی (Dashboard/Alerts/BI/3D/AR)
 - **[API_REFERENCE](API_REFERENCE.md)** - مرجع API به‌روز با endpointهای جدید
+- **[PHASE3_HARDENING](PHASE3_HARDENING.md)** - تست ≥85٪، بهینه‌سازی، API Security، KPIها
 
 ### ⚙️ نصب و راه‌اندازی
 

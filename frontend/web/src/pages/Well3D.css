@@ -2,19 +2,51 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-  color: white;
+  background: #ffffff;
+  color: #111111;
   overflow: hidden;
 }
 
-.well3d-controls {
+.well3d-controls,
+.deh-3d-header {
   display: flex;
   align-items: center;
   gap: 20px;
   padding: 15px 20px;
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: #f7f7f7;
+  border-bottom: 1px solid #e0e0e0;
+  flex-wrap: wrap;
+}
+
+.deh-3d-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-left: 0.5rem;
+  color: #111111;
+}
+
+.deh-3d-brand strong {
+  font-size: 1rem;
+  color: #111111;
+}
+
+.deh-3d-status {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.deh-3d-livebar {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: #333333;
 }
 
 .control-group {
@@ -26,50 +58,53 @@
 .control-group label {
   font-weight: 500;
   font-size: 14px;
+  color: #111111;
 }
 
 .control-group select {
   padding: 8px 12px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  border: 1px solid #cccccc;
+  background: #ffffff;
+  color: #111111;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.3s;
 }
 
 .control-group select:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: #f5f5f5;
+  border-color: #999999;
 }
 
 .control-group select option {
-  background: #2a5298;
-  color: white;
+  background: #ffffff;
+  color: #111111;
 }
 
-.control-group input[type="checkbox"] {
+.control-group input[type='checkbox'] {
   width: 18px;
   height: 18px;
   cursor: pointer;
 }
 
 .well-info {
-  margin-left: auto;
+  margin-right: auto;
   text-align: right;
+  color: #111111;
 }
 
 .well-info h2 {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
+  color: #111111;
 }
 
 .well-info p {
   margin: 5px 0 0 0;
   font-size: 14px;
-  opacity: 0.8;
+  color: #555555;
 }
 
 .well3d-viewport {
@@ -81,55 +116,55 @@
 .well3d-canvas {
   width: 100%;
   height: 100%;
-  background: linear-gradient(to bottom, #87ceeb 0%, #1e3c72 100%);
+  background: linear-gradient(to bottom, #e3f2fd 0%, #bbdefb 100%);
 }
 
 .sensor-tooltip {
-  background: rgba(0, 0, 0, 0.9);
+  background: #ffffff;
   padding: 12px 16px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid #e0e0e0;
   min-width: 200px;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  color: #111111;
 }
 
 .sensor-tooltip h4 {
   margin: 0 0 8px 0;
   font-size: 16px;
-  color: #4a90e2;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #1565c0;
+  border-bottom: 1px solid #e0e0e0;
   padding-bottom: 6px;
 }
 
 .sensor-tooltip p {
   margin: 4px 0;
   font-size: 13px;
-  color: #e0e0e0;
+  color: #333333;
 }
 
 .sensor-tooltip p:last-child {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid #e0e0e0;
   font-weight: 600;
 }
 
 .surface-data-panel {
-  background: rgba(0, 0, 0, 0.85);
+  background: #ffffff;
   padding: 16px 20px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   min-width: 250px;
+  color: #111111;
 }
 
 .surface-data-panel h3 {
   margin: 0 0 12px 0;
   font-size: 18px;
-  color: #4a90e2;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #1565c0;
+  border-bottom: 1px solid #e0e0e0;
   padding-bottom: 8px;
 }
 
@@ -137,7 +172,7 @@
   display: flex;
   justify-content: space-between;
   padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid #f0f0f0;
   font-size: 14px;
 }
 
@@ -146,24 +181,24 @@
 }
 
 .data-row span:first-child {
-  color: #b0b0b0;
+  color: #555555;
 }
 
 .data-row span:last-child {
-  color: #ffffff;
+  color: #111111;
   font-weight: 600;
 }
 
 .well3d-legend {
   padding: 15px 20px;
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: #f7f7f7;
+  border-top: 1px solid #e0e0e0;
   display: flex;
   gap: 30px;
   flex-wrap: wrap;
   max-height: 200px;
   overflow-y: auto;
+  color: #111111;
 }
 
 .legend-section {
@@ -175,6 +210,7 @@
   margin: 0 0 12px 0;
   font-size: 16px;
   font-weight: 600;
+  color: #111111;
 }
 
 .legend-item {
@@ -183,28 +219,26 @@
   gap: 10px;
   margin-bottom: 8px;
   font-size: 14px;
+  color: #333333;
 }
 
 .legend-color {
   width: 20px;
   height: 20px;
   border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid #cccccc;
 }
 
 .legend-color.normal {
-  background: #00ff00;
-  box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+  background: #2e7d32;
 }
 
 .legend-color.warning {
-  background: #ffaa00;
-  box-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
+  background: #f9a825;
 }
 
 .legend-color.critical {
-  background: #ff0000;
-  box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+  background: #c62828;
 }
 
 .loading,
@@ -214,41 +248,24 @@
   justify-content: center;
   height: 100%;
   font-size: 18px;
-  color: white;
+  color: #111111;
 }
 
 .error {
-  color: #ff6b6b;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  .well3d-controls {
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .well-info {
-    margin-left: 0;
-    width: 100%;
-    text-align: left;
-  }
-
-  .surface-data-panel {
-    min-width: 200px;
-    font-size: 12px;
-  }
+  color: #c62828;
 }
 
 .well3d-whatif {
   padding: 1rem 1.25rem;
-  background: rgba(0, 0, 0, 0.35);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: #f7f7f7;
+  border-top: 1px solid #e0e0e0;
+  color: #111111;
 }
 
 .well3d-whatif h3 {
   margin: 0 0 0.75rem;
   font-size: 1rem;
+  color: #111111;
 }
 
 .whatif-controls {
@@ -263,14 +280,15 @@
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.85rem;
+  color: #333333;
 }
 
 .whatif-controls button {
   padding: 0.5rem 1rem;
-  background: #4a6cf7;
+  background: #1565c0;
   border: none;
   border-radius: 6px;
-  color: #fff;
+  color: #ffffff;
   cursor: pointer;
   font-weight: 600;
 }
@@ -278,12 +296,31 @@
 .whatif-results {
   margin-top: 0.75rem;
   padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.08);
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
   border-radius: 6px;
   font-size: 0.9rem;
+  color: #111111;
 }
 
 .whatif-results p {
   margin: 0.25rem 0;
 }
 
+@media (max-width: 768px) {
+  .well3d-controls {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .well-info {
+    margin-right: 0;
+    width: 100%;
+    text-align: right;
+  }
+
+  .surface-data-panel {
+    min-width: 200px;
+    font-size: 12px;
+  }
+}

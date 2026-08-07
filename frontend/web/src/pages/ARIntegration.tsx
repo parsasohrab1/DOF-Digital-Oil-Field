@@ -1,281 +1,280 @@
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts'
 import { digitalTwinAPI } from '../api/services'
+import { FIELD, DEHLORAN_WELLS } from '../data/dehloranField'
+import {
+  buildDehloranArDevices,
+  buildDehloranArSessions,
+  buildDehloranArAnchors,
+  buildDehloranArBim,
+  buildArTelemetrySeries,
+  buildArOverlayPayload,
+  STATUS_COLOR,
+  STATUS_LABEL_FA,
+  type ArAnchor,
+} from '../data/dehloranAr'
 import './ARIntegration.css'
 
-interface ARDevice {
-  deviceId: string
-  deviceType: 'HoloLens' | 'Magic Leap' | 'Tablet AR'
-  user: string
-  location: string
-  wellName: string
-  connectionStatus: 'connected' | 'disconnected'
-  batteryLevel: number
-  activeSession: boolean
-  lastUpdate: string
-}
-
-interface ARSession {
-  sessionId: string
-  deviceId: string
-  user: string
-  wellName: string
-  startTime: string
-  duration: number // minutes
-  componentsViewed: string[]
-  annotationsCreated: number
-  dataPointsAccessed: number
-}
-
-interface BIMComponent {
-  componentId: string
-  name: string
-  type: 'pump' | 'valve' | 'sensor' | 'pipeline'
-  location: string
-  status: 'normal' | 'warning' | 'critical'
-  realTimeData: {
-    pressure?: number
-    temperature?: number
-    flowRate?: number
-  }
-}
-
 export default function ARIntegration() {
-  const [selectedDevice, setSelectedDevice] = useState<string>('AR-001')
-  const [selectedWell, setSelectedWell] = useState<string>('PROD-001')
+  const [tick, setTick] = useState(Date.now())
+  const [selectedDevice, setSelectedDevice] = useState('AR-DEH-01')
+  const [selectedWell, setSelectedWell] = useState(DEHLORAN_WELLS[0].id)
+  const [focusAnchor, setFocusAnchor] = useState<string | null>(null)
+  const [hudLocked, setHudLocked] = useState(true)
 
-  // Mock data for AR devices
-  const { data: arDevices = [] } = useQuery({
-    queryKey: ['ar-devices'],
-    queryFn: async () => {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      return [
-        {
-          deviceId: 'AR-001',
-          deviceType: 'HoloLens' as const,
-          user: 'John Smith',
-          location: 'Field A',
-          wellName: 'PROD-001',
-          connectionStatus: 'connected' as const,
-          batteryLevel: 85,
-          activeSession: true,
-          lastUpdate: 'Just now'
-        },
-        {
-          deviceId: 'AR-002',
-          deviceType: 'Magic Leap' as const,
-          user: 'Sarah Johnson',
-          location: 'Field B',
-          wellName: 'PROD-002',
-          connectionStatus: 'connected' as const,
-          batteryLevel: 72,
-          activeSession: false,
-          lastUpdate: '2 minutes ago'
-        },
-        {
-          deviceId: 'AR-003',
-          deviceType: 'Tablet AR' as const,
-          user: 'Mike Davis',
-          location: 'Field C',
-          wellName: 'DEV-001',
-          connectionStatus: 'disconnected' as const,
-          batteryLevel: 0,
-          activeSession: false,
-          lastUpdate: '15 minutes ago'
-        }
-      ] as ARDevice[]
-    },
-    refetchInterval: 5000
-  })
+  useEffect(() => {
+    const id = window.setInterval(() => setTick(Date.now()), 8000)
+    return () => window.clearInterval(id)
+  }, [])
 
-  // Mock data for active sessions
-  const { data: activeSessions = [] } = useQuery({
-    queryKey: ['ar-sessions'],
-    queryFn: async () => {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      return [
-        {
-          sessionId: 'SESSION-001',
-          deviceId: 'AR-001',
-          user: 'John Smith',
-          wellName: 'PROD-001',
-          startTime: '10:30 AM',
-          duration: 25,
-          componentsViewed: ['Pump-001', 'Valve-003', 'Sensor-005'],
-          annotationsCreated: 3,
-          dataPointsAccessed: 45
-        }
-      ] as ARSession[]
-    },
-    refetchInterval: 5000
-  })
+  const devices = useMemo(() => buildDehloranArDevices(tick), [tick])
+  const sessions = useMemo(() => buildDehloranArSessions(devices, tick), [devices, tick])
+  const anchors = useMemo(() => buildDehloranArAnchors(tick), [tick])
+  const bim = useMemo(() => buildDehloranArBim(selectedWell, tick), [selectedWell, tick])
+  const series = useMemo(() => buildArTelemetrySeries(selectedWell, tick), [selectedWell, tick])
+  const localOverlay = useMemo(() => buildArOverlayPayload(selectedWell, tick), [selectedWell, tick])
 
-  // Mock data for BIM components — use digital twin BIM scene when available
-  const { data: bimComponents = [] } = useQuery({
-    queryKey: ['bim-components', selectedWell],
+  useEffect(() => {
+    if (!devices.find((d) => d.deviceId === selectedDevice) && devices[0]) {
+      setSelectedDevice(devices[0].deviceId)
+    }
+  }, [devices, selectedDevice])
+
+  const selectedDeviceData = devices.find((d) => d.deviceId === selectedDevice)
+  const focused: ArAnchor | undefined =
+    anchors.find((a) => a.id === focusAnchor) ||
+    anchors.find((a) => a.wellId === selectedWell) ||
+    anchors[0]
+
+  useEffect(() => {
+    if (selectedDeviceData?.wellId) {
+      setSelectedWell(selectedDeviceData.wellId)
+      setFocusAnchor(`ANC-${selectedDeviceData.wellId}`)
+    }
+  }, [selectedDeviceData?.wellId])
+
+  const { data: remoteOverlay } = useQuery({
+    queryKey: ['ar-overlay-deh', selectedWell],
     queryFn: async () => {
       try {
-        const scene = await digitalTwinAPI.getBimScene(selectedWell)
-        const models = scene?.models || scene?.components || []
-        if (models.length) {
-          return models.map((m: any) => ({
-            componentId: m.model_id || m.id,
-            name: m.name || m.label,
-            type: (m.type || 'sensor') as BIMComponent['type'],
-            location: m.location || m.zone || '—',
-            status: (m.status || 'normal') as BIMComponent['status'],
-            realTimeData: m.real_time_data || m.sensors || {},
-          })) as BIMComponent[]
-        }
+        return await digitalTwinAPI.getAROverlay(selectedWell)
       } catch {
-        // fall through to mock
+        return null
       }
-      await new Promise(resolve => setTimeout(resolve, 300))
-      return [
-        {
-          componentId: 'PUMP-001',
-          name: 'Main Production Pump',
-          type: 'pump' as const,
-          location: 'Wellhead Platform',
-          status: 'normal' as const,
-          realTimeData: {
-            pressure: 2500,
-            temperature: 85,
-            flowRate: 850
-          }
-        },
-        {
-          componentId: 'VALVE-003',
-          name: 'Master Valve',
-          type: 'valve' as const,
-          location: 'Christmas Tree',
-          status: 'warning' as const,
-          realTimeData: {
-            pressure: 2300
-          }
-        },
-        {
-          componentId: 'SENSOR-005',
-          name: 'Pressure Sensor',
-          type: 'sensor' as const,
-          location: 'Tubing Head',
-          status: 'normal' as const,
-          realTimeData: {
-            pressure: 2450,
-            temperature: 82
-          }
-        },
-        {
-          componentId: 'PIPE-002',
-          name: 'Production Pipeline',
-          type: 'pipeline' as const,
-          location: 'Flow Line',
-          status: 'normal' as const,
-          realTimeData: {
-            flowRate: 850,
-            temperature: 78
-          }
-        }
-      ] as BIMComponent[]
     },
-    refetchInterval: 3000
+    refetchInterval: 12000,
+    retry: 0,
   })
 
-  // Mock real-time data history
-  const realTimeHistory = Array.from({ length: 20 }, (_, i) => ({
-    time: i,
-    pressure: 2400 + Math.random() * 200,
-    temperature: 80 + Math.random() * 10,
-    flowRate: 800 + Math.random() * 100
-  }))
-
-  const selectedDeviceData = arDevices.find(d => d.deviceId === selectedDevice)
-
-  const { data: arOverlayData } = useQuery({
-    queryKey: ['ar-overlay', selectedWell],
-    queryFn: () => digitalTwinAPI.getAROverlay(selectedWell),
-    refetchInterval: 5000
-  })
-
-  const { data: whatIfResult } = useQuery({
-    queryKey: ['ar-what-if', selectedWell],
-    queryFn: () =>
-      digitalTwinAPI.runWhatIfScenario({
-        well_name: selectedWell,
-        base_conditions: { flow_rate: 840, pressure: 2450, temperature: 84 },
-        adjustments: { choke_pct: -5, pump_speed_pct: 6 },
-        horizon_hours: 12
-      }),
-    refetchInterval: 20000
-  })
+  const overlay = remoteOverlay?.anchors ? remoteOverlay : localOverlay
 
   return (
-    <div className="ar-integration-page">
-      <div className="page-header">
-        <h1>AR Integration</h1>
-        <p>3D BIM models connected to AR devices for field technicians</p>
-      </div>
+    <div className="ar-integration-page deh-ar" dir="rtl">
+      <header className="deh-ar-hero">
+        <div>
+          <p className="deh-ar-client">{FIELD.clientFa}</p>
+          <h1>واقعیت افزوده میدان — {FIELD.nameFa}</h1>
+          <p className="deh-ar-meta">
+            پوشش بصری ۱۶ حلقه · نمایشگر سربلند سرچاهی · مدل اطلاعات تأسیسات قطعات · دبی‌سنج مجازی و درصد آب تولیدی روی لنگرهای واقعیت افزوده
+          </p>
+        </div>
+        <label className="deh-ar-lock">
+          <input type="checkbox" checked={hudLocked} onChange={(e) => setHudLocked(e.target.checked)} />
+          قفل نمایشگر سربلند روی لنگر
+        </label>
+      </header>
 
       <div className="ar-stats-grid">
         <div className="stat-card">
-          <h3>Active AR Devices</h3>
-          <div className="stat-value">{arDevices.filter(d => d.connectionStatus === 'connected').length}</div>
-          <div className="stat-label">Total: {arDevices.length}</div>
-        </div>
-        <div className="stat-card">
-          <h3>Active Sessions</h3>
-          <div className="stat-value">{activeSessions.length}</div>
-          <div className="stat-label">Technicians in field</div>
-        </div>
-        <div className="stat-card">
-          <h3>Components Viewed</h3>
+          <h3>دستگاه‌های آنلاین</h3>
           <div className="stat-value">
-            {activeSessions.reduce((sum, s) => sum + s.componentsViewed.length, 0)}
+            {devices.filter((d) => d.connectionStatus === 'connected').length}
           </div>
-          <div className="stat-label">In current sessions</div>
+          <div className="stat-label">از {devices.length} دستگاه میدان</div>
         </div>
         <div className="stat-card">
-          <h3>Data Points Accessed</h3>
+          <h3>نشست‌های فعال</h3>
+          <div className="stat-value">{sessions.length}</div>
+          <div className="stat-label">تکنسین در میدان دهلران</div>
+        </div>
+        <div className="stat-card">
+          <h3>لنگرهای واقعیت افزوده</h3>
+          <div className="stat-value">{anchors.length}</div>
+          <div className="stat-label">چاه + تأسیسات</div>
+        </div>
+        <div className="stat-card">
+          <h3>نقاط داده در نشست</h3>
           <div className="stat-value">
-            {activeSessions.reduce((sum, s) => sum + s.dataPointsAccessed, 0)}
+            {sessions.reduce((s, x) => s + x.dataPointsAccessed, 0)}
           </div>
-          <div className="stat-label">Real-time sensor data</div>
+          <div className="stat-label">تله‌متری زنده پوشش بصری</div>
         </div>
       </div>
 
+      {/* —— Visual AR viewport —— */}
+      <section className="deh-ar-viewport-wrap">
+        <div className="deh-ar-viewport-head">
+          <h2>نمای واقعیت افزوده (شبیه‌سازی فیلدی)</h2>
+          <select
+            value={selectedWell}
+            onChange={(e) => {
+              setSelectedWell(e.target.value)
+              setFocusAnchor(`ANC-${e.target.value}`)
+            }}
+          >
+            {DEHLORAN_WELLS.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.nameFa} ({w.id})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="deh-ar-viewport">
+          <div className="deh-ar-sky" />
+          <div className="deh-ar-ground" />
+          <div className="deh-ar-reticle" />
+
+          {anchors.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              className={`deh-ar-anchor ${a.kind} ${focused?.id === a.id ? 'focused' : ''}`}
+              style={{
+                left: `${a.x}%`,
+                top: `${a.y}%`,
+                borderColor: STATUS_COLOR[a.status],
+              }}
+              onClick={() => {
+                setFocusAnchor(a.id)
+                if (a.wellId.startsWith('DEH-')) setSelectedWell(a.wellId)
+              }}
+              title={a.labelFa}
+            >
+              <i style={{ background: STATUS_COLOR[a.status] }} />
+              <span className="anc-label">{a.labelFa.replace('چاه دهلران ', 'D')}</span>
+            </button>
+          ))}
+
+          {focused && hudLocked && (
+            <div
+              className="deh-ar-hud"
+              style={{
+                left: `min(${Math.min(focused.x + 6, 72)}%, 72%)`,
+                top: `min(${Math.max(focused.y - 8, 8)}%, 70%)`,
+                borderColor: STATUS_COLOR[focused.status],
+              }}
+            >
+              <div className="hud-title">
+                <strong>{focused.labelFa}</strong>
+                <em style={{ color: STATUS_COLOR[focused.status] }}>
+                  {STATUS_LABEL_FA[focused.status]}
+                </em>
+              </div>
+              <div className="hud-grid">
+                {focused.hud.thp != null && (
+                  <div>
+                    <span>فشار سرچاهی</span>
+                    <b>{focused.hud.thp} psi</b>
+                  </div>
+                )}
+                {focused.hud.tht != null && (
+                  <div>
+                    <span>دمای سرچاهی</span>
+                    <b>{focused.hud.tht} °C</b>
+                  </div>
+                )}
+                {focused.hud.oil != null && (
+                  <div>
+                    <span>نفت</span>
+                    <b>{focused.hud.oil} bbl/d</b>
+                  </div>
+                )}
+                {focused.hud.waterCut != null && (
+                  <div>
+                    <span>درصد آب تولیدی</span>
+                    <b>{focused.hud.waterCut}%</b>
+                  </div>
+                )}
+                {focused.hud.vfm != null && (
+                  <div className="accent">
+                    <span>دبی‌سنج مجازی</span>
+                    <b>{focused.hud.vfm} bbl/d</b>
+                  </div>
+                )}
+                {focused.hud.pumpOnline != null && (
+                  <div>
+                    <span>پمپ</span>
+                    <b>{focused.hud.pumpOnline ? 'آنلاین' : 'آفلاین'}</b>
+                  </div>
+                )}
+              </div>
+              <p className="hud-hint">لنگر قفل شد · داده زنده میدان دهلران</p>
+            </div>
+          )}
+
+          <div className="deh-ar-compass">N · میدان دهلران</div>
+        </div>
+      </section>
+
       <div className="ar-content-grid">
         <div className="devices-section">
-          <h2>AR Devices</h2>
+          <h2>دستگاه‌های واقعیت افزوده میدان</h2>
           <div className="devices-list">
-            {arDevices.map(device => (
+            {devices.map((device) => (
               <div
                 key={device.deviceId}
-                className={`device-card ${device.connectionStatus} ${selectedDevice === device.deviceId ? 'selected' : ''}`}
+                className={`device-card ${device.connectionStatus} ${
+                  selectedDevice === device.deviceId ? 'selected' : ''
+                }`}
                 onClick={() => setSelectedDevice(device.deviceId)}
               >
                 <div className="device-header">
                   <span className="device-id">{device.deviceId}</span>
                   <span className={`connection-status ${device.connectionStatus}`}>
-                    {device.connectionStatus}
+                    {device.connectionStatus === 'connected' ? 'متصل' : 'قطع'}
                   </span>
                 </div>
                 <div className="device-info">
-                  <p><strong>Type:</strong> {device.deviceType}</p>
-                  <p><strong>User:</strong> {device.user}</p>
-                  <p><strong>Location:</strong> {device.location}</p>
-                  <p><strong>Well:</strong> {device.wellName}</p>
-                  <p><strong>Battery:</strong> {device.batteryLevel}%</p>
-                  <p><strong>Session:</strong> {device.activeSession ? 'Active' : 'Inactive'}</p>
-                  <p><strong>Last Update:</strong> {device.lastUpdate}</p>
+                  <p>
+                    <strong>نوع:</strong> {device.deviceType}
+                  </p>
+                  <p>
+                    <strong>کاربر:</strong> {device.userFa} ({device.roleFa})
+                  </p>
+                  <p>
+                    <strong>موقعیت:</strong> {device.locationFa}
+                  </p>
+                  <p>
+                    <strong>چاه:</strong> {device.wellId}
+                  </p>
+                  <p>
+                    <strong>سیگنال:</strong> {device.signalDbm} dBm
+                  </p>
+                  <p>
+                    <strong>آخرین به‌روزرسانی:</strong> {device.lastUpdateFa}
+                  </p>
                 </div>
                 <div className="battery-indicator">
                   <div className="battery-bar">
-                    <div 
-                      className={`battery-fill ${device.batteryLevel > 50 ? 'high' : device.batteryLevel > 20 ? 'medium' : 'low'}`}
+                    <div
+                      className={`battery-fill ${
+                        device.batteryLevel > 50 ? 'high' : device.batteryLevel > 20 ? 'medium' : 'low'
+                      }`}
                       style={{ width: `${device.batteryLevel}%` }}
-                    ></div>
+                    />
                   </div>
+                  <span className="bat-txt">{device.batteryLevel}%</span>
                 </div>
               </div>
             ))}
@@ -283,28 +282,42 @@ export default function ARIntegration() {
         </div>
 
         <div className="sessions-section">
-          <h2>Active Sessions</h2>
-          {activeSessions.length > 0 ? (
+          <h2>نشست‌های فعال فیلدی</h2>
+          {sessions.length > 0 ? (
             <div className="sessions-list">
-              {activeSessions.map(session => (
+              {sessions.map((session) => (
                 <div key={session.sessionId} className="session-card">
                   <div className="session-header">
-                    <h3>{session.user}</h3>
-                    <span className="session-duration">{session.duration} min</span>
+                    <h3>{session.userFa}</h3>
+                    <span className="session-duration">{session.durationMin} دقیقه</span>
                   </div>
                   <div className="session-info">
-                    <p><strong>Device:</strong> {session.deviceId}</p>
-                    <p><strong>Well:</strong> {session.wellName}</p>
-                    <p><strong>Started:</strong> {session.startTime}</p>
-                    <p><strong>Components Viewed:</strong> {session.componentsViewed.length}</p>
-                    <p><strong>Annotations:</strong> {session.annotationsCreated}</p>
-                    <p><strong>Data Points:</strong> {session.dataPointsAccessed}</p>
+                    <p>
+                      <strong>ماموریت:</strong> {session.taskFa}
+                    </p>
+                    <p>
+                      <strong>دستگاه:</strong> {session.deviceId}
+                    </p>
+                    <p>
+                      <strong>چاه:</strong> {session.wellId}
+                    </p>
+                    <p>
+                      <strong>شروع:</strong> {session.startTimeFa}
+                    </p>
+                    <p>
+                      <strong>چک‌لیست:</strong> {session.checklistDone}/{session.checklistTotal}
+                    </p>
+                    <p>
+                      <strong>حاشیه نویسی:</strong> {session.annotationsCreated}
+                    </p>
                   </div>
                   <div className="components-list">
-                    <strong>Components:</strong>
+                    <strong>قطعات دیده‌شده در واقعیت افزوده:</strong>
                     <div className="components-tags">
-                      {session.componentsViewed.map(comp => (
-                        <span key={comp} className="component-tag">{comp}</span>
+                      {session.componentsViewed.map((comp) => (
+                        <span key={comp} className="component-tag">
+                          {comp}
+                        </span>
                       ))}
                     </div>
                   </div>
@@ -313,94 +326,100 @@ export default function ARIntegration() {
             </div>
           ) : (
             <div className="no-sessions">
-              <p>No active AR sessions</p>
+              <p>نشست فعالی نیست</p>
             </div>
           )}
         </div>
       </div>
 
-      {selectedDeviceData && (
-        <div className="bim-components-section">
-          <h2>Selected Device Context</h2>
-          <p>
-            <strong>{selectedDeviceData.deviceId}</strong> ({selectedDeviceData.deviceType}) operated by{' '}
-            <strong>{selectedDeviceData.user}</strong> at <strong>{selectedDeviceData.location}</strong>.
-          </p>
-        </div>
-      )}
-
       <div className="bim-components-section">
-        <h2>3D BIM Components - {selectedWell}</h2>
-        <div className="well-selector">
-          <select value={selectedWell} onChange={(e) => setSelectedWell(e.target.value)}>
-            <option value="PROD-001">PROD-001</option>
-            <option value="PROD-002">PROD-002</option>
-            <option value="DEV-001">DEV-001</option>
-            <option value="OBS-001">OBS-001</option>
-          </select>
-        </div>
+        <h2>قطعات مدل اطلاعات تأسیسات قابل‌نمایش در واقعیت افزوده — {selectedWell}</h2>
+        <p className="section-sub">
+          هر قطعه با داده زنده و راهنمای بصری برای تکنسین هدست / تبلت
+        </p>
         <div className="components-grid">
-          {bimComponents.map(component => (
+          {bim.map((component) => (
             <div key={component.componentId} className={`component-card ${component.status}`}>
               <div className="component-header">
-                <h3>{component.name}</h3>
-                <span className={`status-badge ${component.status}`}>{component.status}</span>
+                <h3>{component.nameFa}</h3>
+                <span className={`status-badge ${component.status}`}>
+                  {component.status === 'normal'
+                    ? 'عادی'
+                    : component.status === 'warning'
+                      ? 'هشدار'
+                      : 'بحرانی'}
+                </span>
               </div>
               <div className="component-info">
-                <p><strong>ID:</strong> {component.componentId}</p>
-                <p><strong>Type:</strong> {component.type}</p>
-                <p><strong>Location:</strong> {component.location}</p>
+                <p>
+                  <strong>شناسه:</strong> {component.componentId}
+                </p>
+                <p>
+                  <strong>نوع:</strong> {component.type}
+                </p>
+                <p>
+                  <strong>محل:</strong> {component.locationFa}
+                </p>
               </div>
               <div className="realtime-data">
-                <h4>Real-Time Data (Visible in AR)</h4>
-                {component.realTimeData.pressure && (
-                  <p>Pressure: <strong>{component.realTimeData.pressure} psi</strong></p>
+                <h4>داده زنده روی نمایشگر سربلند</h4>
+                {component.realTimeData.pressure != null && (
+                  <p>
+                    فشار: <strong>{component.realTimeData.pressure} psi</strong>
+                  </p>
                 )}
-                {component.realTimeData.temperature && (
-                  <p>Temperature: <strong>{component.realTimeData.temperature} °C</strong></p>
+                {component.realTimeData.temperature != null && (
+                  <p>
+                    دما: <strong>{component.realTimeData.temperature} °C</strong>
+                  </p>
                 )}
-                {component.realTimeData.flowRate && (
-                  <p>Flow Rate: <strong>{component.realTimeData.flowRate} bbl/day</strong></p>
+                {component.realTimeData.flowRate != null && (
+                  <p>
+                    دبی: <strong>{component.realTimeData.flowRate} bbl/d</strong>
+                  </p>
+                )}
+                {component.realTimeData.waterCut != null && (
+                  <p>
+                    درصد آب تولیدی: <strong>{component.realTimeData.waterCut}%</strong>
+                  </p>
+                )}
+                {component.realTimeData.currentA != null && (
+                  <p>
+                    جریان پمپ درون‌چاهی الکتریکی: <strong>{component.realTimeData.currentA} A</strong>
+                  </p>
                 )}
               </div>
+              <p className="ar-hint">{component.arHintFa}</p>
             </div>
           ))}
         </div>
       </div>
 
       <div className="realtime-chart-section">
-        <h2>Real-Time Sensor Data (AR Overlay)</h2>
+        <h2>روند تله‌متری روی پوشش بصری واقعیت افزوده — {selectedWell}</h2>
         <div className="chart-container">
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={realTimeHistory}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="time" />
-              <YAxis yAxisId="left" />
-              <YAxis yAxisId="right" orientation="right" />
-              <Tooltip />
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={series}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+              <XAxis dataKey="t" stroke="#888" />
+              <YAxis yAxisId="left" stroke="#888" />
+              <YAxis yAxisId="right" orientation="right" stroke="#888" />
+              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #ccc', color: '#111' }} />
               <Legend />
-              <Line yAxisId="left" type="monotone" dataKey="pressure" stroke="#e74c3c" name="Pressure (psi)" />
-              <Line yAxisId="left" type="monotone" dataKey="temperature" stroke="#f39c12" name="Temperature (°C)" />
-              <Line yAxisId="right" type="monotone" dataKey="flowRate" stroke="#3498db" name="Flow Rate (bbl/day)" />
+              <Line yAxisId="left" type="monotone" dataKey="pressure" stroke="#ef5350" name="فشار (psi)" dot={false} />
+              <Line yAxisId="left" type="monotone" dataKey="temperature" stroke="#ffa726" name="دما (°C)" dot={false} />
+              <Line yAxisId="right" type="monotone" dataKey="oil" stroke="#42a5f5" name="نفت (bbl/d)" dot={false} />
+              <Line yAxisId="right" type="monotone" dataKey="vfm" stroke="#66bb6a" name="دبی‌سنج مجازی" strokeDasharray="4 3" dot={false} />
+              <Line yAxisId="right" type="monotone" dataKey="waterCut" stroke="#ab47bc" name="درصد آب تولیدی %" dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      <div className="bim-components-section">
-        <h2>AR Overlay Payload (Live from Digital Twin)</h2>
-        <pre style={{ maxHeight: 220, overflow: 'auto', background: '#f8f8f8', padding: '10px' }}>
-          {JSON.stringify(arOverlayData || {}, null, 2)}
-        </pre>
-      </div>
-
-      <div className="bim-components-section">
-        <h2>What-if Scenario (Digital Twin)</h2>
-        <pre style={{ maxHeight: 220, overflow: 'auto', background: '#f8f8f8', padding: '10px' }}>
-          {JSON.stringify(whatIfResult || {}, null, 2)}
-        </pre>
+      <div className="bim-components-section overlay-panel">
+        <h2>بسته پوشش بصری ارسالی به هدست</h2>
+        <pre>{JSON.stringify(overlay, null, 2)}</pre>
       </div>
     </div>
   )
 }
-

@@ -12,8 +12,8 @@
 .ml-models-header select {
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid #444;
-  background: #1e1e1e;
+  border: 1px solid #e0e0e0;
+  background: #ffffff;
   color: #fff;
 }
 
@@ -24,8 +24,8 @@
 }
 
 .ml-card {
-  background: #1e1e1e;
-  border: 1px solid #333;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
   border-radius: 8px;
   padding: 1rem;
 }
@@ -37,7 +37,7 @@
 .ml-card h3 {
   margin: 0 0 0.75rem;
   font-size: 1rem;
-  color: #aaa;
+  color: #555555;
 }
 
 .model-list {
@@ -50,7 +50,7 @@
   display: flex;
   justify-content: space-between;
   padding: 0.4rem 0;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .versions-table {
@@ -63,12 +63,12 @@
 .versions-table td {
   text-align: left;
   padding: 0.4rem;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .metric-tag {
   display: inline-block;
-  background: #333;
+  background: #f5f5f5;
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
   margin: 0.1rem;
@@ -86,8 +86,8 @@
 .form-row input {
   padding: 0.4rem 0.6rem;
   border-radius: 4px;
-  border: 1px solid #444;
-  background: #2a2a2a;
+  border: 1px solid #e0e0e0;
+  background: #f5f5f5;
   color: #fff;
   flex: 1;
   min-width: 120px;
@@ -109,8 +109,8 @@
 
 .ml-card textarea {
   width: 100%;
-  background: #2a2a2a;
-  border: 1px solid #444;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
   border-radius: 4px;
   color: #fff;
   padding: 0.5rem;
@@ -118,7 +118,7 @@
 }
 
 .muted {
-  color: #888;
+  color: #555555;
   font-size: 0.875rem;
 }
 
@@ -127,7 +127,7 @@
 .drift-result {
   margin-top: 0.75rem;
   padding: 0.75rem;
-  background: #2a2a2a;
+  background: #f5f5f5;
   border-radius: 6px;
   font-size: 0.875rem;
 }

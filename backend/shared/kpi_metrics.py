@@ -13,42 +13,66 @@ except ImportError:  # pragma: no cover
     Counter = Gauge = Histogram = None  # type: ignore
 
 # Performance
-API_LATENCY = Histogram(
-    "ogim_kpi_api_latency_seconds",
-    "API latency for executive KPI tracking",
-    ["service"],
-    buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5),
-) if PROM_ENABLED else None
+API_LATENCY = (
+    Histogram(
+        "ogim_kpi_api_latency_seconds",
+        "API latency for executive KPI tracking",
+        ["service"],
+        buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5),
+    )
+    if PROM_ENABLED
+    else None
+)
 
-SYSTEM_UPTIME_RATIO = Gauge(
-    "ogim_kpi_system_uptime_ratio",
-    "Rolling system uptime ratio (0-1)",
-) if PROM_ENABLED else None
+SYSTEM_UPTIME_RATIO = (
+    Gauge(
+        "ogim_kpi_system_uptime_ratio",
+        "Rolling system uptime ratio (0-1)",
+    )
+    if PROM_ENABLED
+    else None
+)
 
 # Adoption
-FEATURE_USAGE = Counter(
-    "ogim_kpi_feature_usage_total",
-    "Feature adoption counter by page/feature",
-    ["feature"],
-) if PROM_ENABLED else None
+FEATURE_USAGE = (
+    Counter(
+        "ogim_kpi_feature_usage_total",
+        "Feature adoption counter by page/feature",
+        ["feature"],
+    )
+    if PROM_ENABLED
+    else None
+)
 
-ACTIVE_USERS = Gauge(
-    "ogim_kpi_active_users",
-    "Approximate active users in current window",
-) if PROM_ENABLED else None
+ACTIVE_USERS = (
+    Gauge(
+        "ogim_kpi_active_users",
+        "Approximate active users in current window",
+    )
+    if PROM_ENABLED
+    else None
+)
 
 # Alert quality
-ALERT_FALSE_POSITIVE = Counter(
-    "ogim_kpi_alert_false_positive_total",
-    "Alerts marked as false positive",
-    ["severity"],
-) if PROM_ENABLED else None
+ALERT_FALSE_POSITIVE = (
+    Counter(
+        "ogim_kpi_alert_false_positive_total",
+        "Alerts marked as false positive",
+        ["severity"],
+    )
+    if PROM_ENABLED
+    else None
+)
 
-ALERT_TOTAL = Counter(
-    "ogim_kpi_alert_total",
-    "Total alerts generated",
-    ["severity"],
-) if PROM_ENABLED else None
+ALERT_TOTAL = (
+    Counter(
+        "ogim_kpi_alert_total",
+        "Total alerts generated",
+        ["severity"],
+    )
+    if PROM_ENABLED
+    else None
+)
 
 # In-memory rolling stats (for /kpi/summary when Prometheus unavailable)
 _kpi_state: Dict[str, Any] = {
