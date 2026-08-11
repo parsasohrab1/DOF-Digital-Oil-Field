@@ -251,6 +251,15 @@ def test_realtime_websocket_delivers_pushed_event_immediately():
         )
         assert publish_response.status_code == 200
 
-        message = websocket.receive_json()
-        assert message["type"] == "sensor_data"
+        # The fallback heartbeat snapshot (sent when nothing has been
+        # pushed recently) can legitimately interleave with the pushed
+        # event depending on scheduling, so scan a bounded number of
+        # messages rather than assuming the very first one is ours.
+        message = None
+        for _ in range(5):
+            candidate = websocket.receive_json()
+            if candidate.get("type") == "sensor_data":
+                message = candidate
+                break
+        assert message is not None, "sensor_data event was never delivered"
         assert message["data"]["sensor_records"][0]["sensor_id"] == "WELL-1-pressure"
