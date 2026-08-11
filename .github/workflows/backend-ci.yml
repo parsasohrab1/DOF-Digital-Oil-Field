@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install black flake8 alembic
+          pip install black flake8 alembic pytest pytest-cov
           pip install -r requirements.txt
           pip install -r backend/shared/requirements.txt
           pip install -r backend/alert-service/requirements.txt
@@ -32,6 +32,9 @@ jobs:
           pip install -r backend/api-gateway/requirements.txt
           pip install -r backend/ml-inference-service/requirements.txt
           pip install -r backend/auth-service/requirements.txt
+          pip install -r backend/digital-twin-service/requirements.txt
+          pip install -r backend/reporting-service/requirements.txt
+          pip install -r backend/remote-operations-service/requirements.txt
 
       - name: Run black
         run: black --check backend
