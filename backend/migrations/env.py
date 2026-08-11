@@ -6,18 +6,23 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-# add shared package to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "shared"))
+# add backend root to path so `shared` can be imported as a package
+# (shared/database.py does `from .config import settings`, a relative
+# import that requires shared to be loaded as shared.database, not as a
+# bare top-level `database` module)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from config import settings  # noqa: E402
-from database import Base  # noqa: E402
+from shared.config import settings  # noqa: E402
+from shared.database import Base  # noqa: E402
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-if not config.get_main_option("sqlalchemy.url"):
-    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+database_url = os.environ.get("SQLALCHEMY_DATABASE_URL") or config.get_main_option(
+    "sqlalchemy.url"
+)
+config.set_main_option("sqlalchemy.url", database_url or settings.DATABASE_URL)
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:
