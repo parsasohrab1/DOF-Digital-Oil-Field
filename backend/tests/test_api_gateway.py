@@ -5,7 +5,6 @@ import pytest
 import httpx
 from fastapi.testclient import TestClient
 
-
 MODULE_PATH = Path(__file__).resolve().parents[1] / "api-gateway" / "main.py"
 spec = importlib.util.spec_from_file_location("api_gateway", MODULE_PATH)
 api_gateway = importlib.util.module_from_spec(spec)
@@ -245,7 +244,9 @@ def test_realtime_websocket_delivers_pushed_event_immediately():
             headers={"X-Internal-Token": api_gateway.settings.INTERNAL_SERVICE_TOKEN},
             json={
                 "type": "sensor_data",
-                "data": {"sensor_records": [{"sensor_id": "WELL-1-pressure", "value": 123.4}]},
+                "data": {
+                    "sensor_records": [{"sensor_id": "WELL-1-pressure", "value": 123.4}]
+                },
             },
         )
         assert publish_response.status_code == 200

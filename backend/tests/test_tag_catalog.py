@@ -1,6 +1,7 @@
 """
 Tests for tag catalog service
 """
+
 import importlib.util
 import pytest
 import sys
@@ -8,7 +9,7 @@ import os
 from pathlib import Path
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "tag-catalog-service" / "main.py"
 spec = importlib.util.spec_from_file_location("tag_catalog_service_main", MODULE_PATH)

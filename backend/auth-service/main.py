@@ -2,6 +2,7 @@
 Authentication & Authorization Service
 Handles OIDC/OAuth2, RBAC/ABAC, mTLS, and session management
 """
+
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +14,7 @@ import sys
 import os
 
 # Add backend root to path so `shared` is importable as a package
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.database import get_db
 from shared.models import User

@@ -1,6 +1,7 @@
 """
 Rate limiting middleware
 """
+
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 import time

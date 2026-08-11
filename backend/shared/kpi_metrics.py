@@ -1,6 +1,7 @@
 """
 Executive KPI metrics for OGIM (Prometheus + summary helpers).
 """
+
 from datetime import datetime
 from typing import Any, Dict, Optional
 

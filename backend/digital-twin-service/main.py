@@ -2,6 +2,7 @@
 Digital Twin Service
 Hosts engineering calculations, process simulations, and 3D BIM models
 """
+
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -652,9 +653,11 @@ async def run_what_if_scenario(
             "integrity_risk": integrity_risk,
         },
         "recommendations": [
-            "Reduce choke adjustment if integrity risk is medium/high."
-            if integrity_risk != "low"
-            else "Scenario is operationally acceptable.",
+            (
+                "Reduce choke adjustment if integrity risk is medium/high."
+                if integrity_risk != "low"
+                else "Scenario is operationally acceptable."
+            ),
             "Monitor pressure transient in first 2 hours after applying setpoints.",
         ],
         "timeline": [

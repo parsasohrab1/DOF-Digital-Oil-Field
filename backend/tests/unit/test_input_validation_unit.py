@@ -1,4 +1,5 @@
 """Unit tests for shared.input_validation."""
+
 import pytest
 
 from shared.input_validation import (

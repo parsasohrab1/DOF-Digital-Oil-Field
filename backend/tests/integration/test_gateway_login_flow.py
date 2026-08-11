@@ -7,13 +7,13 @@ any user to ever obtain their first token through the gateway. These tests
 exercise the real (unmocked) `authenticate_request` / `enforce_zero_trust`
 gateway logic to make sure that regression can't come back silently.
 """
+
 import importlib.util
 from pathlib import Path
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-
 
 MODULE_PATH = Path(__file__).resolve().parents[2] / "api-gateway" / "main.py"
 spec = importlib.util.spec_from_file_location("api_gateway_login_flow", MODULE_PATH)

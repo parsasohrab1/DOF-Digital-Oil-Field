@@ -1,6 +1,7 @@
 """
 Tests for authentication service
 """
+
 import importlib.util
 import sys
 import os
@@ -9,7 +10,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # Loaded via importlib with a unique module name: several test files in this
 # suite use a service's own directory + `from main import ...`, which all

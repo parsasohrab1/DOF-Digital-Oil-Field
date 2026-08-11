@@ -10,6 +10,7 @@ This replaces a frontend-only mock (hardcoded node list, Math.random()
 "training history") with real, testable aggregation math and a genuine
 local-training helper an edge node can call before submitting.
 """
+
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -63,7 +64,9 @@ class FederatedLearningCoordinator:
         data_size: int,
     ) -> EdgeNodeState:
         if len(local_weights) != WEIGHT_DIM:
-            raise ValueError(f"local_weights must have length {WEIGHT_DIM} (got {len(local_weights)}).")
+            raise ValueError(
+                f"local_weights must have length {WEIGHT_DIM} (got {len(local_weights)})."
+            )
         if data_size <= 0:
             raise ValueError("data_size must be positive.")
         if not (0.0 <= local_accuracy <= 1.0):
@@ -79,7 +82,11 @@ class FederatedLearningCoordinator:
             status="syncing",
         )
         self.nodes[node_id] = node
-        logger.info("Federated node %s submitted a local update (data_size=%d)", node_id, data_size)
+        logger.info(
+            "Federated node %s submitted a local update (data_size=%d)",
+            node_id,
+            data_size,
+        )
         return node
 
     def aggregate_round(self, min_nodes: int = 2) -> Dict[str, Any]:
@@ -97,7 +104,9 @@ class FederatedLearningCoordinator:
         sample_weights = np.array([n.data_size / total_data for n in nodes])
 
         new_global_weights = np.average(weight_matrix, axis=0, weights=sample_weights)
-        new_global_accuracy = float(np.average([n.local_accuracy for n in nodes], weights=sample_weights))
+        new_global_accuracy = float(
+            np.average([n.local_accuracy for n in nodes], weights=sample_weights)
+        )
 
         self.round_number += 1
         self.global_weights = new_global_weights.tolist()
@@ -121,7 +130,11 @@ class FederatedLearningCoordinator:
             "round": self.round_number,
             "global_weights": self.global_weights,
             "global_accuracy": self.global_accuracy,
-            "accuracy_delta": None if previous_accuracy is None else new_global_accuracy - previous_accuracy,
+            "accuracy_delta": (
+                None
+                if previous_accuracy is None
+                else new_global_accuracy - previous_accuracy
+            ),
             "participating_nodes": len(nodes),
             "convergence_status": self.convergence_status(),
         }
@@ -130,7 +143,10 @@ class FederatedLearningCoordinator:
         if len(self.round_history) < 2:
             return "converging"
         recent = self.round_history[-CONVERGENCE_WINDOW:]
-        deltas = [recent[i]["global_accuracy"] - recent[i - 1]["global_accuracy"] for i in range(1, len(recent))]
+        deltas = [
+            recent[i]["global_accuracy"] - recent[i - 1]["global_accuracy"]
+            for i in range(1, len(recent))
+        ]
         if not deltas:
             return "converging"
         if all(d < -1e-9 for d in deltas):
@@ -164,7 +180,9 @@ class FederatedLearningCoordinator:
         }
 
 
-def train_local_linear_model(samples: List[Dict[str, float]], labels: List[float]) -> Dict[str, Any]:
+def train_local_linear_model(
+    samples: List[Dict[str, float]], labels: List[float]
+) -> Dict[str, Any]:
     """Fit a small local model on this node's own sensor data and return
     ONLY its coefficients. The raw `samples`/`labels` are meant to stay on
     the caller's own process/device -- only this function's return value

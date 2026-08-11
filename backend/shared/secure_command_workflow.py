@@ -5,6 +5,7 @@ Two-stage secure command workflow combining 2FA with Digital Twin validation.
 State is persisted on the `commands` row (not an in-memory dict) so it
 survives process restarts and is shared across worker processes/replicas.
 """
+
 import logging
 from typing import Dict, Optional, Any
 from datetime import datetime

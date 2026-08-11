@@ -6,6 +6,7 @@ All operations other than emergency shutdown go through the secure command
 workflow (2FA -> Digital Twin simulation -> two-person approval -> execution).
 Approval is always mandatory for these; there is no client-supplied bypass.
 """
+
 import os
 import sys
 from datetime import datetime
@@ -417,9 +418,11 @@ async def get_operation_status(
         status=command.status,
         progress=progress,
         current_value=None,  # Would be fetched from equipment
-        target_value=command.parameters.get("target_value")
-        if isinstance(command.parameters, dict)
-        else None,
+        target_value=(
+            command.parameters.get("target_value")
+            if isinstance(command.parameters, dict)
+            else None
+        ),
         estimated_completion=None,
         error_message=None,
     )

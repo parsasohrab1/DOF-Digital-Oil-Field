@@ -2,6 +2,7 @@
 API Gateway Service
 Single entry point for all UI and API requests
 """
+
 from fastapi import (
     FastAPI,
     Request,
@@ -441,7 +442,9 @@ async def kpi_feature_usage(payload: Dict[str, Any]):
     if not feature or len(feature) > 128:
         raise HTTPException(status_code=400, detail="Invalid feature name")
     if contains_suspicious_content(feature):
-        raise HTTPException(status_code=400, detail="Request contains blocked input patterns")
+        raise HTTPException(
+            status_code=400, detail="Request contains blocked input patterns"
+        )
     record_feature_usage(feature)
     return {"recorded": True, "feature": feature}
 
@@ -600,7 +603,9 @@ async def realtime_websocket(websocket: WebSocket, token: str = Query(default=""
             try:
                 # Primary path: forward pushed events (e.g. from
                 # data-ingestion-service) the instant they arrive.
-                pushed = await asyncio.wait_for(queue.get(), timeout=REALTIME_FALLBACK_POLL_SECONDS)
+                pushed = await asyncio.wait_for(
+                    queue.get(), timeout=REALTIME_FALLBACK_POLL_SECONDS
+                )
                 await websocket.send_json(pushed)
             except asyncio.TimeoutError:
                 # Nothing pushed recently: fall back to a snapshot so alerts
@@ -836,9 +841,11 @@ async def proxy_request(
 
     risk_score, reasons = threat_detector.evaluate(
         ip=_client_ip(request),
-        user=(request.state.user or {}).get("sub")
-        if hasattr(request.state, "user")
-        else None,
+        user=(
+            (request.state.user or {}).get("sub")
+            if hasattr(request.state, "user")
+            else None
+        ),
         path=request.url.path,
         method=request.method,
         status_code=response.status_code,

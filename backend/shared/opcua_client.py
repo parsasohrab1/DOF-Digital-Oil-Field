@@ -1,6 +1,7 @@
 """
 OPC-UA Client for SCADA/PLC connectivity
 """
+
 from typing import List, Dict, Any, Optional
 from opcua import Client, ua
 from datetime import datetime

@@ -1,6 +1,7 @@
 """
 PyTest configuration and fixtures
 """
+
 import os
 import pytest
 import sys
@@ -20,7 +21,7 @@ from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
 # Add backend root to path for shared package imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.database import Base
 from shared.models import User

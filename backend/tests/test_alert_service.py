@@ -1,6 +1,7 @@
 """
 Tests for alert service
 """
+
 import pytest
 import sys
 import os
@@ -189,10 +190,11 @@ def test_single_well_alert_has_no_facility_correlation(client):
 
     facility_response = client.get("/alerts/correlations/facility")
     assert facility_response.status_code == 200
-    facility_ids = {g["facility_correlation_id"] for g in facility_response.json()["groups"]}
+    facility_ids = {
+        g["facility_correlation_id"] for g in facility_response.json()["groups"]
+    }
     matching = [
-        fid for fid in facility_ids
-        if fid and "flow_anomaly_unique_rule" in fid
+        fid for fid in facility_ids if fid and "flow_anomaly_unique_rule" in fid
     ]
     assert matching == []
 
@@ -221,7 +223,9 @@ def test_rca_reports_systemic_root_cause_across_wells(client):
         )
         assert response.status_code == 201
 
-    rca_response = client.post(f"/alerts/{last_alert_id}/rca", json={"lookback_minutes": 60})
+    rca_response = client.post(
+        f"/alerts/{last_alert_id}/rca", json={"lookback_minutes": 60}
+    )
     assert rca_response.status_code == 200
     rca = rca_response.json()["rca"]
     assert rca["scope"] == "facility"

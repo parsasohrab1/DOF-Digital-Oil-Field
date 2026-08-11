@@ -2,6 +2,7 @@
 Disconnected Operation Manager for Edge Computing
 مدیریت عملیات در حالت قطع ارتباط برای Edge Computing
 """
+
 import asyncio
 import json
 import logging
@@ -79,8 +80,7 @@ class DisconnectedOperationManager:
             cursor = conn.cursor()
 
             # Critical alerts table
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS critical_alerts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     alert_id TEXT UNIQUE NOT NULL,
@@ -94,8 +94,7 @@ class DisconnectedOperationManager:
                     synced BOOLEAN DEFAULT FALSE,
                     created_at REAL NOT NULL
                 )
-            """
-            )
+            """)
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_timestamp ON critical_alerts (timestamp)"
             )
@@ -107,8 +106,7 @@ class DisconnectedOperationManager:
             )
 
             # Local decisions table
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS local_decisions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     decision_id TEXT UNIQUE NOT NULL,
@@ -121,8 +119,7 @@ class DisconnectedOperationManager:
                     synced BOOLEAN DEFAULT FALSE,
                     created_at REAL NOT NULL
                 )
-            """
-            )
+            """)
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_decisions_timestamp ON local_decisions (timestamp)"
             )
@@ -131,8 +128,7 @@ class DisconnectedOperationManager:
             )
 
             # Processed data cache
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS processed_data_cache (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     cache_key TEXT UNIQUE NOT NULL,
@@ -141,8 +137,7 @@ class DisconnectedOperationManager:
                     expires_at REAL,
                     created_at REAL NOT NULL
                 )
-            """
-            )
+            """)
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_expires ON processed_data_cache (expires_at)"
             )

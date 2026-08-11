@@ -113,14 +113,18 @@ def test_bi_connectors(client):
 
 def test_data_quality_lineage(client):
     """POST /reports/data-quality-lineage returns quality scores and lineage graph."""
-    response = client.post(
-        "/reports/data-quality-lineage", json={"lookback_hours": 2}
-    )
+    response = client.post("/reports/data-quality-lineage", json={"lookback_hours": 2})
     assert response.status_code == 200
     body = response.json()
     assert "quality" in body
     q = body["quality"]
-    for key in ("overall_score", "completeness", "validity", "timeliness", "consistency"):
+    for key in (
+        "overall_score",
+        "completeness",
+        "validity",
+        "timeliness",
+        "consistency",
+    ):
         assert key in q
     assert 0 <= q["overall_score"] <= 1
     assert "lineage" in body

@@ -2,6 +2,7 @@
 Reporting Service
 Generates periodic and on-demand analytical reports
 """
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -351,9 +352,11 @@ async def _execute_step(step: WorkflowStep, context: Dict[str, Any]) -> Dict[str
             return {
                 "status_code": response.status_code,
                 "ok": response.is_success,
-                "body": response.json()
-                if "application/json" in response.headers.get("content-type", "")
-                else response.text,
+                "body": (
+                    response.json()
+                    if "application/json" in response.headers.get("content-type", "")
+                    else response.text
+                ),
             }
 
     if step_type == "generate_report":

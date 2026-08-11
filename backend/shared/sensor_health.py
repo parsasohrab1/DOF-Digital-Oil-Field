@@ -2,6 +2,7 @@
 Sensor Health Monitoring and Drift Detection
 Automated detection of sensor drift and data correction before ML models
 """
+
 import logging
 import numpy as np
 from typing import Any, Dict, List, Optional, Tuple
@@ -213,10 +214,12 @@ class SensorHealthMonitor:
         for sensor_id, health_score in self.health_scores.items():
             drift_detected, drift_magnitude = self.drift_detector.detect_drift(
                 sensor_id,
-                self.drift_detector.sensor_history[sensor_id][-1]["value"]
-                if sensor_id in self.drift_detector.sensor_history
-                and self.drift_detector.sensor_history[sensor_id]
-                else 0,
+                (
+                    self.drift_detector.sensor_history[sensor_id][-1]["value"]
+                    if sensor_id in self.drift_detector.sensor_history
+                    and self.drift_detector.sensor_history[sensor_id]
+                    else 0
+                ),
             )
 
             summary[sensor_id] = {

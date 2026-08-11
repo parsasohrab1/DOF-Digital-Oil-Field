@@ -3,6 +3,7 @@ Edge Computing Service
 Provides local processing and analysis at the edge for remote oil field locations
 Reduces latency and bandwidth requirements by processing data locally
 """
+
 import asyncio
 import json
 import os
@@ -17,7 +18,7 @@ from pydantic import BaseModel, Field
 import uvicorn
 
 # Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.config import settings
 from shared.logging_config import setup_logging
@@ -234,16 +235,14 @@ def trend_analysis(sensor_data: List[SensorDataPoint]) -> Dict[str, Any]:
             trend = (
                 "increasing"
                 if second_avg > first_avg * 1.05
-                else "decreasing"
-                if second_avg < first_avg * 0.95
-                else "stable"
+                else "decreasing" if second_avg < first_avg * 0.95 else "stable"
             )
 
             results[sensor_id] = {
                 "trend": trend,
-                "rate_of_change": (second_avg - first_avg) / first_avg
-                if first_avg != 0
-                else 0,
+                "rate_of_change": (
+                    (second_avg - first_avg) / first_avg if first_avg != 0 else 0
+                ),
                 "current_value": values[-1],
                 "first_value": values[0],
             }

@@ -2,6 +2,7 @@
 MQTT Client for Wireless Sensor Integration
 پشتیبانی از MQTT برای سنسورهای بی‌سیم
 """
+
 import asyncio
 import json
 import logging
@@ -318,9 +319,11 @@ class MQTTMessageHandler:
             "message_count": self.message_count,
             "error_count": self.error_count,
             "last_message_time": self.last_message_time,
-            "success_rate": (self.message_count - self.error_count) / self.message_count
-            if self.message_count > 0
-            else 0,
+            "success_rate": (
+                (self.message_count - self.error_count) / self.message_count
+                if self.message_count > 0
+                else 0
+            ),
         }
 
 

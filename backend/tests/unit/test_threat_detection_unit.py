@@ -1,4 +1,5 @@
 """Unit tests for SIEM buffer and threat detection."""
+
 import pytest
 
 from shared.threat_detection import SIEMEventLogger, ThreatDetector, siem_logger

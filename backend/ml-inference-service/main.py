@@ -2,6 +2,7 @@
 ML Inference Service
 Provides low-latency model inference for anomaly detection and failure prediction
 """
+
 import os
 import sys
 import time
@@ -14,7 +15,7 @@ from pydantic import BaseModel, field_validator
 import numpy as np
 
 # Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.config import settings
 from shared.logging_config import setup_logging
@@ -22,7 +23,12 @@ from shared.auth import require_roles
 from shared.metrics import setup_metrics
 from shared.tracing import setup_tracing
 from rul_model import rul_model_manager
-from federated_learning import federated_coordinator, train_local_linear_model, WEIGHT_DIM, FEATURE_NAMES
+from federated_learning import (
+    federated_coordinator,
+    train_local_linear_model,
+    WEIGHT_DIM,
+    FEATURE_NAMES,
+)
 
 # Setup logging
 logger = setup_logging("ml-inference-service")
@@ -768,7 +774,9 @@ async def detect_drift(
 async def submit_federated_update(
     node_id: str,
     request: FederatedNodeUpdateRequest,
-    _: Dict[str, Any] = Depends(require_roles({"system_admin", "data_engineer", "field_operator"})),
+    _: Dict[str, Any] = Depends(
+        require_roles({"system_admin", "data_engineer", "field_operator"})
+    ),
 ):
     """Register an edge node's local model update (weights only, never raw data)."""
     try:
@@ -797,7 +805,9 @@ async def submit_federated_update(
 async def train_and_submit_federated_update(
     node_id: str,
     request: FederatedLocalTrainRequest,
-    _: Dict[str, Any] = Depends(require_roles({"system_admin", "data_engineer", "field_operator"})),
+    _: Dict[str, Any] = Depends(
+        require_roles({"system_admin", "data_engineer", "field_operator"})
+    ),
 ):
     """Fit a local model on this node's own samples and submit only the
     resulting weights -- the samples/labels in the request body are what an
@@ -838,17 +848,24 @@ async def aggregate_federated_round(
 
 @app.get("/federated/nodes")
 async def list_federated_nodes(
-    _: Dict[str, Any] = Depends(require_roles({"system_admin", "data_engineer", "field_operator"})),
+    _: Dict[str, Any] = Depends(
+        require_roles({"system_admin", "data_engineer", "field_operator"})
+    ),
 ):
     return {"nodes": federated_coordinator.get_state()["nodes"]}
 
 
 @app.get("/federated/global-model")
 async def get_federated_global_model(
-    _: Dict[str, Any] = Depends(require_roles({"system_admin", "data_engineer", "field_operator"})),
+    _: Dict[str, Any] = Depends(
+        require_roles({"system_admin", "data_engineer", "field_operator"})
+    ),
 ):
     state = federated_coordinator.get_state()
-    return {"global_model": state["global_model"], "round_history": state["round_history"]}
+    return {
+        "global_model": state["global_model"],
+        "round_history": state["round_history"],
+    }
 
 
 @app.get("/health")

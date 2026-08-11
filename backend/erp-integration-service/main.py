@@ -2,6 +2,7 @@
 ERP Integration Service
 Integrates with enterprise systems (SAP, Oracle, etc.) for automated work orders
 """
+
 import asyncio
 import json
 import os
@@ -16,7 +17,7 @@ from pydantic import BaseModel, Field
 import uvicorn
 
 # Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.config import settings
 from shared.logging_config import setup_logging

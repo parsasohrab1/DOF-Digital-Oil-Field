@@ -1,6 +1,7 @@
 """
 Shared configuration management
 """
+
 import os
 from pathlib import Path
 from typing import Optional
@@ -264,9 +265,15 @@ class Settings(BaseSettings):
     SIEM_OUTPUT_FILE: Optional[str] = Field(default=None, env="SIEM_OUTPUT_FILE")
 
     # API / Cache performance tuning
-    API_GATEWAY_UPSTREAM_TIMEOUT_SECONDS: int = Field(default=15, env="API_GATEWAY_UPSTREAM_TIMEOUT_SECONDS")
-    API_GATEWAY_HTTP_KEEPALIVE_CONNECTIONS: int = Field(default=100, env="API_GATEWAY_HTTP_KEEPALIVE_CONNECTIONS")
-    API_GATEWAY_HTTP_MAX_CONNECTIONS: int = Field(default=300, env="API_GATEWAY_HTTP_MAX_CONNECTIONS")
+    API_GATEWAY_UPSTREAM_TIMEOUT_SECONDS: int = Field(
+        default=15, env="API_GATEWAY_UPSTREAM_TIMEOUT_SECONDS"
+    )
+    API_GATEWAY_HTTP_KEEPALIVE_CONNECTIONS: int = Field(
+        default=100, env="API_GATEWAY_HTTP_KEEPALIVE_CONNECTIONS"
+    )
+    API_GATEWAY_HTTP_MAX_CONNECTIONS: int = Field(
+        default=300, env="API_GATEWAY_HTTP_MAX_CONNECTIONS"
+    )
 
     # Shared secret for service-to-service pushes into the Gateway's realtime
     # WebSocket stream (see POST /internal/realtime/publish). Not a user-facing
@@ -274,10 +281,18 @@ class Settings(BaseSettings):
     INTERNAL_SERVICE_TOKEN: str = Field(
         default="dev-internal-token-change-in-production", env="INTERNAL_SERVICE_TOKEN"
     )
-    API_SECURITY_MAX_BODY_BYTES: int = Field(default=1024 * 1024, env="API_SECURITY_MAX_BODY_BYTES")
-    API_SECURITY_MAX_QUERY_PARAMS: int = Field(default=50, env="API_SECURITY_MAX_QUERY_PARAMS")
-    API_SECURITY_MAX_PARAM_LENGTH: int = Field(default=1024, env="API_SECURITY_MAX_PARAM_LENGTH")
-    API_SECURITY_ENABLE_INPUT_HARDENING: bool = Field(default=True, env="API_SECURITY_ENABLE_INPUT_HARDENING")
+    API_SECURITY_MAX_BODY_BYTES: int = Field(
+        default=1024 * 1024, env="API_SECURITY_MAX_BODY_BYTES"
+    )
+    API_SECURITY_MAX_QUERY_PARAMS: int = Field(
+        default=50, env="API_SECURITY_MAX_QUERY_PARAMS"
+    )
+    API_SECURITY_MAX_PARAM_LENGTH: int = Field(
+        default=1024, env="API_SECURITY_MAX_PARAM_LENGTH"
+    )
+    API_SECURITY_ENABLE_INPUT_HARDENING: bool = Field(
+        default=True, env="API_SECURITY_ENABLE_INPUT_HARDENING"
+    )
     CACHE_TTL_SECONDS: int = Field(default=30, env="CACHE_TTL_SECONDS")
     CACHE_MAX_ENTRIES: int = Field(default=2048, env="CACHE_MAX_ENTRIES")
 
@@ -362,7 +377,9 @@ class Settings(BaseSettings):
 
     # SMS Alert Notifications (Kavenegar / Twilio / mock)
     SMS_ENABLED: bool = Field(default=True, env="SMS_ENABLED")
-    SMS_PROVIDER: str = Field(default="mock", env="SMS_PROVIDER")  # mock|kavenegar|twilio
+    SMS_PROVIDER: str = Field(
+        default="mock", env="SMS_PROVIDER"
+    )  # mock|kavenegar|twilio
     SMS_SEVERITIES: str = Field(default="critical,warning", env="SMS_SEVERITIES")
     KAVENEGAR_API_KEY: Optional[str] = Field(default=None, env="KAVENEGAR_API_KEY")
     KAVENEGAR_SENDER: str = Field(default="10008663", env="KAVENEGAR_SENDER")

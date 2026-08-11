@@ -10,7 +10,9 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "data-ingestion-service" / "main.py"
-spec = importlib.util.spec_from_file_location("data_ingestion_service_main", MODULE_PATH)
+spec = importlib.util.spec_from_file_location(
+    "data_ingestion_service_main", MODULE_PATH
+)
 data_ingestion_service_main = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
 spec.loader.exec_module(data_ingestion_service_main)
@@ -47,8 +49,14 @@ def override_get_tsdb(test_db):
 def client(test_db, test_user, admin_user, monkeypatch):
     app.dependency_overrides[get_db] = override_get_db(test_db)
     app.dependency_overrides[get_timescale_db] = override_get_tsdb(test_db)
-    app.dependency_overrides[require_ingest_read] = lambda: {"sub": test_user.username, "role": test_user.role}
-    app.dependency_overrides[require_ingest_admin] = lambda: {"sub": admin_user.username, "role": admin_user.role}
+    app.dependency_overrides[require_ingest_read] = lambda: {
+        "sub": test_user.username,
+        "role": test_user.role,
+    }
+    app.dependency_overrides[require_ingest_admin] = lambda: {
+        "sub": admin_user.username,
+        "role": admin_user.role,
+    }
     monkeypatch.setattr(data_ingestion_service_main, "kafka_producer", None)
     monkeypatch.setattr(data_ingestion_service_main, "opcua_client", None)
     test_client = TestClient(app)

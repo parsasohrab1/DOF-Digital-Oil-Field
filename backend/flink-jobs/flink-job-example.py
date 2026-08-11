@@ -2,6 +2,7 @@
 Apache Flink Stream Processing Job Example
 Processes sensor data streams for real-time analytics
 """
+
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.connectors.kafka import FlinkKafkaConsumer, FlinkKafkaProducer
 from pyflink.common.serialization import SimpleStringSchema
@@ -90,9 +91,9 @@ class AnomalyDetector(KeyedProcessFunction):
             alert = {
                 "alert_id": f"ALERT-{ctx.timestamp()}-{data['sensor_id']}",
                 "timestamp": datetime.now().isoformat(),
-                "severity": "critical"
-                if data.get("data_quality") == "critical"
-                else "warning",
+                "severity": (
+                    "critical" if data.get("data_quality") == "critical" else "warning"
+                ),
                 "status": "open",
                 "well_name": data.get("well_name"),
                 "sensor_id": data.get("sensor_id"),
@@ -149,9 +150,9 @@ def create_flink_job(low_latency: bool = False):
     kafka_props = {
         "bootstrap.servers": settings.KAFKA_BOOTSTRAP_SERVERS,
         "group.id": "flink-sensor-processor" + ("-lowlatency" if low_latency else ""),
-        "auto.offset.reset": "latest"
-        if low_latency
-        else "earliest",  # Latest for real-time
+        "auto.offset.reset": (
+            "latest" if low_latency else "earliest"
+        ),  # Latest for real-time
     }
 
     # Add low-latency consumer settings

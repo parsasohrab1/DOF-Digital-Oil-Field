@@ -2,6 +2,7 @@
 TimescaleDB Compression Policy Manager
 مدیریت سیاست‌های فشرده‌سازی برای داده‌های قدیمی
 """
+
 import logging
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
@@ -384,12 +385,12 @@ class CompressionManager:
                     chunks.append(
                         {
                             "chunk_name": row.chunk_name,
-                            "range_start": row.range_start.isoformat()
-                            if row.range_start
-                            else None,
-                            "range_end": row.range_end.isoformat()
-                            if row.range_end
-                            else None,
+                            "range_start": (
+                                row.range_start.isoformat() if row.range_start else None
+                            ),
+                            "range_end": (
+                                row.range_end.isoformat() if row.range_end else None
+                            ),
                             "is_compressed": row.is_compressed,
                             "size": row.size,
                             "size_bytes": row.size_bytes,

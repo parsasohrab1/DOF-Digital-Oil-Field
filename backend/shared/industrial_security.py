@@ -2,6 +2,7 @@
 Industrial Security Layer
 Provides security for Layer 1 & 2 network protocols and protection against industrial attacks
 """
+
 import logging
 import struct
 import hashlib

@@ -9,8 +9,12 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-MODULE_PATH = Path(__file__).resolve().parents[1] / "remote-operations-service" / "main.py"
-spec = importlib.util.spec_from_file_location("remote_operations_service_main", MODULE_PATH)
+MODULE_PATH = (
+    Path(__file__).resolve().parents[1] / "remote-operations-service" / "main.py"
+)
+spec = importlib.util.spec_from_file_location(
+    "remote_operations_service_main", MODULE_PATH
+)
 remote_operations_service_main = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
 spec.loader.exec_module(remote_operations_service_main)

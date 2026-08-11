@@ -2,6 +2,7 @@
 LoRaWAN Client for Low-Power Wireless Sensor Integration
 پشتیبانی از LoRaWAN برای سنسورهای کم‌مصرف بی‌سیم
 """
+
 import json
 import logging
 import time
@@ -294,9 +295,11 @@ class LoRaWANClient:
             "network_type": self.network_type,
             "message_count": self.message_count,
             "error_count": self.error_count,
-            "success_rate": (self.message_count - self.error_count) / self.message_count
-            if self.message_count > 0
-            else 0,
+            "success_rate": (
+                (self.message_count - self.error_count) / self.message_count
+                if self.message_count > 0
+                else 0
+            ),
         }
 
 

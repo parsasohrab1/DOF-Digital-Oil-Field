@@ -1,6 +1,7 @@
 """
 Authentication and authorization dependencies shared across services.
 """
+
 from typing import Dict, Iterable, Any
 
 from fastapi import Depends, HTTPException, status
@@ -43,7 +44,7 @@ def require_roles(allowed_roles: Iterable[str]):
     allowed = set(allowed_roles)
 
     def verifier(
-        payload: Dict[str, Any] = Depends(require_authentication)
+        payload: Dict[str, Any] = Depends(require_authentication),
     ) -> Dict[str, Any]:
         role = payload.get("role")
         if role not in allowed:

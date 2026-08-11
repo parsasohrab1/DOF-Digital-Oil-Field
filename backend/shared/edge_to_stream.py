@@ -3,6 +3,7 @@ Edge-to-Stream Architecture
 Direct integration from Edge Computing to Apache Flink with sub-second latency
 Optimized data path from OPC UA/Modbus to stream processing
 """
+
 import asyncio
 import json
 import logging

@@ -2,6 +2,7 @@
 Data Ingestion Service
 Manages connectors, schema validation, and DLQ handling
 """
+
 import asyncio
 import json
 import os
@@ -28,7 +29,7 @@ from pydantic import BaseModel, Field
 import uvicorn
 
 # Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.database import get_timescale_db, get_db
 from shared.models import SensorData, Tag
@@ -393,9 +394,12 @@ async def ingest_data(
                 sensor_id=record.sensor_id,
                 value=record.value,
                 timestamp=record.timestamp,
-                expected_range=(tag.valid_range_min, tag.valid_range_max)
-                if tag.valid_range_min is not None and tag.valid_range_max is not None
-                else None,
+                expected_range=(
+                    (tag.valid_range_min, tag.valid_range_max)
+                    if tag.valid_range_min is not None
+                    and tag.valid_range_max is not None
+                    else None
+                ),
             )
 
             # Use corrected value if drift detected
@@ -411,9 +415,11 @@ async def ingest_data(
                 timestamp=record.timestamp,
                 tag_id=record.sensor_id,
                 value=final_value,
-                data_quality=health_status.data_quality
-                if health_status.correction_applied
-                else record.data_quality,
+                data_quality=(
+                    health_status.data_quality
+                    if health_status.correction_applied
+                    else record.data_quality
+                ),
             )
             tsdb.add(db_record)
             validated_records.append(record.dict())
@@ -472,7 +478,9 @@ async def ingest_data(
         # falling through to the generic 400 handler below.
         duration = time.perf_counter() - start_time
         INGEST_LATENCY.labels(source=request.source).observe(duration)
-        INGEST_RECORDS_PER_REQUEST.labels(source=request.source).observe(len(validated_records))
+        INGEST_RECORDS_PER_REQUEST.labels(source=request.source).observe(
+            len(validated_records)
+        )
         if payload_bytes:
             INGEST_PAYLOAD_BYTES.labels(source=request.source).inc(payload_bytes)
         raise

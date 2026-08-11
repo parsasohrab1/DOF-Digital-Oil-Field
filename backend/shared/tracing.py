@@ -1,6 +1,7 @@
 """
 OpenTelemetry tracing helpers.
 """
+
 import os
 from typing import List
 

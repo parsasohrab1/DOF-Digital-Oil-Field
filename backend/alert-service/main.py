@@ -2,6 +2,7 @@
 Alert Service
 Manages alert rules, de-duplication, escalation, and silencing
 """
+
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -13,7 +14,7 @@ import os
 import uuid
 
 # Add shared module to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.database import get_db
 from shared.models import Alert, AlertRule, User
@@ -46,7 +47,9 @@ app.add_middleware(
 
 # Kafka producer
 alert_producer = None
-ALERT_CORRELATION_WINDOW_MINUTES = int(os.getenv("ALERT_CORRELATION_WINDOW_MINUTES", "15"))
+ALERT_CORRELATION_WINDOW_MINUTES = int(
+    os.getenv("ALERT_CORRELATION_WINDOW_MINUTES", "15")
+)
 # Minimum number of distinct wells firing the same rule inside the correlation
 # window before we suspect a shared/systemic cause (SCADA outage, weather,
 # upstream equipment) rather than N independent well-local faults.
@@ -68,7 +71,6 @@ from sms_notify import (  # noqa: E402
     sms_provider_status,
     SMS_OUTBOX,
 )
-
 
 
 class AlertCreate(BaseModel):
@@ -414,13 +416,17 @@ async def create_alert(
             correlation_id = rel_corr
             break
     if not correlation_id:
-        correlation_id = f"corr-{uuid.uuid4().hex[:12]}-{_derive_correlation_key(alert)}"
+        correlation_id = (
+            f"corr-{uuid.uuid4().hex[:12]}-{_derive_correlation_key(alert)}"
+        )
 
     # Cross-well correlation: the same rule firing on several other wells inside
     # the window suggests a shared/systemic cause rather than N unrelated
     # well-local faults. Kept as a separate facility_correlation_id so per-well
     # triage (correlation_id above) is unaffected.
-    cross_well_related = _find_cross_well_candidates(db, alert, ALERT_CORRELATION_WINDOW_MINUTES)
+    cross_well_related = _find_cross_well_candidates(
+        db, alert, ALERT_CORRELATION_WINDOW_MINUTES
+    )
     distinct_wells = {a.well_name for a in cross_well_related} | {alert.well_name}
     facility_correlation_id = None
     if len(distinct_wells) >= ALERT_CROSS_WELL_MIN_WELLS:
@@ -431,7 +437,9 @@ async def create_alert(
                 facility_correlation_id = existing_facility_id
                 break
         if not facility_correlation_id:
-            facility_correlation_id = f"facility-{uuid.uuid4().hex[:12]}-{alert.rule_name}"
+            facility_correlation_id = (
+                f"facility-{uuid.uuid4().hex[:12]}-{alert.rule_name}"
+            )
             # This alert is the one that crossed the threshold: backfill the
             # newly-minted id onto the earlier alerts that made up the signal,
             # so the cluster is visible as a whole and not just from here on.
@@ -466,10 +474,14 @@ async def create_alert(
                 "window_minutes": ALERT_CORRELATION_WINDOW_MINUTES,
                 "related_alert_candidates": [a.alert_id for a in related[:10]],
             },
-            "cross_well_signal": {
-                "distinct_wells": len(distinct_wells),
-                "affected_wells": sorted(distinct_wells)[:20],
-            } if facility_correlation_id else None,
+            "cross_well_signal": (
+                {
+                    "distinct_wells": len(distinct_wells),
+                    "affected_wells": sorted(distinct_wells)[:20],
+                }
+                if facility_correlation_id
+                else None
+            ),
         }
     )
 
@@ -498,6 +510,7 @@ async def create_alert(
 
     # Auto-create work order for critical alerts if enabled (background task)
     if alert.severity == "critical" and settings.ERP_AUTO_CREATE_WORK_ORDERS:
+
         async def create_work_order():
             try:
                 async with httpx.AsyncClient() as client:
@@ -690,7 +703,13 @@ async def list_facility_correlated_alerts(
     several wells at once — a signal of a shared/systemic cause rather than
     independent well-local faults.
     """
-    alerts = db.query(Alert).filter(Alert.status == status).order_by(Alert.timestamp.desc()).limit(limit).all()
+    alerts = (
+        db.query(Alert)
+        .filter(Alert.status == status)
+        .order_by(Alert.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
     groups: Dict[str, Dict[str, Any]] = {}
     for alert in alerts:
         meta = _merge_metadata(alert.metadata_json)
@@ -709,7 +728,9 @@ async def list_facility_correlated_alerts(
         groups[facility_id]["wells"].add(alert.well_name)
         groups[facility_id]["alerts"].append(alert.alert_id)
         groups[facility_id]["count"] += 1
-        if _severity_rank(alert.severity) > _severity_rank(groups[facility_id]["max_severity"]):
+        if _severity_rank(alert.severity) > _severity_rank(
+            groups[facility_id]["max_severity"]
+        ):
             groups[facility_id]["max_severity"] = alert.severity
 
     grouped = []
@@ -717,7 +738,10 @@ async def list_facility_correlated_alerts(
         group["wells"] = sorted(group["wells"])
         group["distinct_wells"] = len(group["wells"])
         grouped.append(group)
-    grouped.sort(key=lambda x: (x["distinct_wells"], _severity_rank(x["max_severity"])), reverse=True)
+    grouped.sort(
+        key=lambda x: (x["distinct_wells"], _severity_rank(x["max_severity"])),
+        reverse=True,
+    )
     return {"groups": grouped, "count": len(grouped)}
 
 
@@ -735,10 +759,16 @@ async def run_alert_rca(
 
     lookback_minutes = max(5, request.lookback_minutes)
     lookback_start = datetime.utcnow() - timedelta(minutes=lookback_minutes)
-    candidates = db.query(Alert).filter(
-        Alert.well_name == alert.well_name,
-        Alert.timestamp >= lookback_start,
-    ).order_by(Alert.timestamp.desc()).limit(100).all()
+    candidates = (
+        db.query(Alert)
+        .filter(
+            Alert.well_name == alert.well_name,
+            Alert.timestamp >= lookback_start,
+        )
+        .order_by(Alert.timestamp.desc())
+        .limit(100)
+        .all()
+    )
     cross_well_candidates = _find_cross_well_candidates(db, alert, lookback_minutes)
 
     rca = _infer_rca(candidates, cross_well_candidates)

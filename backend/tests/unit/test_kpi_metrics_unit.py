@@ -1,4 +1,5 @@
 """Unit tests for shared.kpi_metrics."""
+
 import pytest
 
 from shared import kpi_metrics

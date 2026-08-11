@@ -7,6 +7,7 @@ previous mismatch there (frontend sent a single feature dict where the
 backend requires a list of samples) meant the UI's drift-detection button
 always failed with a 422 in practice despite both sides "existing".
 """
+
 import importlib.util
 import sys
 from pathlib import Path
@@ -66,10 +67,12 @@ class TestDriftDetection:
     def test_baseline_and_detect_full_cycle(self, client):
         baseline_response = client.post(
             "/models/anomaly_detection/drift/baseline",
-            json={"features": [
-                {"pressure": 318, "temperature": 84},
-                {"pressure": 322, "temperature": 86},
-            ]},
+            json={
+                "features": [
+                    {"pressure": 318, "temperature": 84},
+                    {"pressure": 322, "temperature": 86},
+                ]
+            },
         )
         assert baseline_response.status_code == 200
         baseline_body = baseline_response.json()
@@ -108,7 +111,11 @@ class TestABTesting:
     def test_configure_and_read_back_ab_test(self, client):
         configure_response = client.post(
             "/models/anomaly_detection/ab-test",
-            json={"baseline_version": 1, "candidate_version": 2, "candidate_weight": 0.3},
+            json={
+                "baseline_version": 1,
+                "candidate_version": 2,
+                "candidate_weight": 0.3,
+            },
         )
         assert configure_response.status_code == 200
         cfg = configure_response.json()["ab_test"]
@@ -123,14 +130,22 @@ class TestABTesting:
     def test_rejects_out_of_range_weight(self, client):
         response = client.post(
             "/models/anomaly_detection/ab-test",
-            json={"baseline_version": 1, "candidate_version": 2, "candidate_weight": 1.5},
+            json={
+                "baseline_version": 1,
+                "candidate_version": 2,
+                "candidate_weight": 1.5,
+            },
         )
         assert response.status_code == 400
 
     def test_time_series_forecast_not_supported_for_ab_testing(self, client):
         response = client.post(
             "/models/time_series_forecast/ab-test",
-            json={"baseline_version": 1, "candidate_version": 2, "candidate_weight": 0.5},
+            json={
+                "baseline_version": 1,
+                "candidate_version": 2,
+                "candidate_weight": 0.5,
+            },
         )
         assert response.status_code == 400
 
@@ -170,10 +185,16 @@ class TestFederatedLearning:
         assert response.status_code == 400
 
     def test_aggregate_requires_minimum_nodes(self, client):
-        response = client.post("/federated/nodes/NODE-SOLO/update", json={
-            "well_name": "WELL-1", "location": "Field A",
-            "local_weights": [0.1, 0.2, 0.3, 0.4, 0.5], "local_accuracy": 0.9, "data_size": 100,
-        })
+        response = client.post(
+            "/federated/nodes/NODE-SOLO/update",
+            json={
+                "well_name": "WELL-1",
+                "location": "Field A",
+                "local_weights": [0.1, 0.2, 0.3, 0.4, 0.5],
+                "local_accuracy": 0.9,
+                "data_size": 100,
+            },
+        )
         assert response.status_code == 200
 
         agg_response = client.post("/federated/aggregate", json={"min_nodes": 2})
@@ -183,8 +204,12 @@ class TestFederatedLearning:
         # Two nodes with very different weights and very different dataset
         # sizes: the aggregate must land close to the larger node's weights,
         # not a plain unweighted average.
-        self._submit(client, "NODE-SMALL", "WELL-1", [0.0, 0.0, 0.0, 0.0, 0.0], 0.80, 10)
-        self._submit(client, "NODE-BIG", "WELL-2", [10.0, 10.0, 10.0, 10.0, 10.0], 0.90, 990)
+        self._submit(
+            client, "NODE-SMALL", "WELL-1", [0.0, 0.0, 0.0, 0.0, 0.0], 0.80, 10
+        )
+        self._submit(
+            client, "NODE-BIG", "WELL-2", [10.0, 10.0, 10.0, 10.0, 10.0], 0.90, 990
+        )
 
         response = client.post("/federated/aggregate", json={"min_nodes": 2})
         assert response.status_code == 200
@@ -206,17 +231,32 @@ class TestFederatedLearning:
 
     def test_train_and_submit_fits_a_real_local_model(self, client):
         samples = [
-            {"pressure": 300 + i, "temperature": 80 + i * 0.1, "flow_rate": 400, "vibration": 0.1}
+            {
+                "pressure": 300 + i,
+                "temperature": 80 + i * 0.1,
+                "flow_rate": 400,
+                "vibration": 0.1,
+            }
             for i in range(20)
         ] + [
-            {"pressure": 600 + i, "temperature": 95 + i * 0.1, "flow_rate": 700, "vibration": 0.9}
+            {
+                "pressure": 600 + i,
+                "temperature": 95 + i * 0.1,
+                "flow_rate": 700,
+                "vibration": 0.9,
+            }
             for i in range(20)
         ]
         labels = [0.0] * 20 + [1.0] * 20
 
         response = client.post(
             "/federated/nodes/NODE-TRAIN/train-and-submit",
-            json={"well_name": "WELL-3", "location": "Field C", "samples": samples, "labels": labels},
+            json={
+                "well_name": "WELL-3",
+                "location": "Field C",
+                "samples": samples,
+                "labels": labels,
+            },
         )
         assert response.status_code == 200
         body = response.json()
