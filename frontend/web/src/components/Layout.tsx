@@ -39,68 +39,57 @@ export default function Layout({ children }: LayoutProps) {
     })
   }, [location.pathname])
 
+  const link = (to: string, label: string) => (
+    <Link to={to} className={location.pathname === to ? 'active' : ''}>
+      {label}
+    </Link>
+  )
+
   return (
     <div className="layout" dir="rtl">
       <nav className="navbar">
-        <div className="nav-brand">
-          <h1>هوشمندسازی میادین</h1>
-          <span>میدان دهلران · شرکت ملی نفت مناطق مرکزی</span>
-        </div>
-        {user && (
-          <div className="nav-user">
-            {(offlineLive || isOfflineLiveForced()) && (
-              <span className="offline-live-badge" title="اجرای زنده بدون نیاز به اینترنت یا بک‌اند">
-                زنده آفلاین
-              </span>
-            )}
-            <span>
-              {user.username} ({roleFa(user.role)})
-            </span>
+        <div className="navbar-top">
+          <div className="nav-brand">
+            <h1>هوشمندسازی میادین</h1>
+            <span>میدان دهلران · شرکت ملی نفت مناطق مرکزی</span>
           </div>
-        )}
+          {user && (
+            <div className="nav-user">
+              {(offlineLive || isOfflineLiveForced()) && (
+                <span className="offline-live-badge" title="اجرای زنده بدون نیاز به اینترنت یا بک‌اند">
+                  زنده آفلاین
+                </span>
+              )}
+              <span>
+                {user.username} ({roleFa(user.role)})
+              </span>
+            </div>
+          )}
+        </div>
         <div className="nav-links">
-          <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
-            داشبورد
-          </Link>
-          <Link to="/wells" className={location.pathname === '/wells' ? 'active' : ''}>
-            چاه‌ها
-          </Link>
-          <Link to="/alerts" className={location.pathname === '/alerts' ? 'active' : ''}>
-            هشدارها
-          </Link>
-          <Link
-            to="/production-forecast"
-            className={location.pathname === '/production-forecast' ? 'active' : ''}
-          >
-            پیش‌بینی تولید
-          </Link>
-          <Link to="/dvr" className={location.pathname === '/dvr' ? 'active' : ''}>
-            اعتبارسنجی داده
-          </Link>
-          <Link to="/maintenance" className={location.pathname === '/maintenance' ? 'active' : ''}>
-            نگهداری پیش‌بینانه
-          </Link>
-          <Link to="/scada" className={location.pathname === '/scada' ? 'active' : ''}>
-            اسکادا و کنترل‌گر منطقی
-          </Link>
-          <Link to="/well3d" className={location.pathname === '/well3d' ? 'active' : ''}>
-            نمایش سه‌بعدی
-          </Link>
-          <Link
-            to="/ar-integration"
-            className={location.pathname === '/ar-integration' ? 'active' : ''}
-          >
-            واقعیت افزوده
-          </Link>
-          <Link
-            to="/report-builder"
-            className={location.pathname === '/report-builder' ? 'active' : ''}
-          >
-            گزارش‌ساز
-          </Link>
-          <Link to="/system" className={location.pathname === '/system' ? 'active' : ''}>
-            سیستم
-          </Link>
+          {link('/', 'داشبورد')}
+          {link('/wells', 'چاه‌ها')}
+          {link('/alerts', 'هشدارها')}
+          {link('/production-forecast', 'پیش‌بینی تولید')}
+          {link('/dvr', 'اعتبارسنجی داده')}
+          {link('/maintenance', 'نگهداری پیش‌بینانه')}
+          {link('/scada', 'اسکادا و کنترل‌گر منطقی')}
+          {link('/well3d', 'نمایش سه‌بعدی')}
+          {link('/ar-integration', 'واقعیت افزوده')}
+          {link('/report-builder', 'گزارش‌ساز')}
+          {link('/reports', 'گزارش‌ها')}
+          {link('/workflow-automation', 'اتوماسیون گردش‌کار')}
+          {link('/ml-models', 'مدل‌های یادگیری ماشین')}
+          {link('/lstm-forecast', 'پیش‌بینی سری‌زمانی LSTM')}
+          {link('/federated-learning', 'یادگیری فدرال')}
+          {link('/performance', 'عملکرد و KPI')}
+          {link('/soc', 'مرکز امنیت')}
+          {link('/remote-operations', 'عملیات از راه دور')}
+          {link('/storage-optimization', 'بهینه‌سازی ذخیره‌سازی')}
+          {link('/edge-computing', 'پردازش لبه (Edge)')}
+          {link('/data-variables', 'متغیرهای داده')}
+          {link('/blockchain-audit', 'ثبت بلاکچین')}
+          {link('/system', 'سیستم')}
         </div>
       </nav>
       <main className="main-content">{children}</main>

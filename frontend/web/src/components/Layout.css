@@ -10,9 +10,15 @@
   background-color: #ffffff;
   padding: 1rem 2rem;
   display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.navbar-top {
+  display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #e0e0e0;
 }
 
 .nav-brand h1 {
