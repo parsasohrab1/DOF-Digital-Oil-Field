@@ -97,8 +97,8 @@ class ModbusSecurityValidator:
     ) -> bool:
         """Validate write operations with additional security checks"""
         # Check if source IP is authorized for write operations
-        # In production, maintain a whitelist of authorized IPs
-        authorized_write_ips = ["10.0.0.0/8", "192.168.0.0/16"]  # Example
+        # In production, maintain a whitelist of authorized IPs, e.g.
+        # ["10.0.0.0/8", "192.168.0.0/16"]
 
         # Check address ranges (prevent writing to critical addresses)
         if len(data) >= 2:
@@ -386,7 +386,6 @@ class IndustrialProtocolFirewall:
 
                 transaction_id = struct.unpack(">H", packet_data[0:2])[0]
                 protocol_id = struct.unpack(">H", packet_data[2:4])[0]
-                length = struct.unpack(">H", packet_data[4:6])[0]
                 unit_id = packet_data[6]
                 function_code = packet_data[7]
                 data = packet_data[8:]

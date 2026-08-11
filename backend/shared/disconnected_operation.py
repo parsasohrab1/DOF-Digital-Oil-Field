@@ -203,7 +203,7 @@ class DisconnectedOperationManager:
                 cursor.execute(
                     """
                     INSERT OR REPLACE INTO critical_alerts
-                    (alert_id, sensor_id, alert_type, severity, message, data, 
+                    (alert_id, sensor_id, alert_type, severity, message, data,
                      timestamp, synced, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,

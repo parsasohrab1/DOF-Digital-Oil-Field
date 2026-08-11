@@ -181,7 +181,7 @@ class CompressionManager:
 
                 # Get compression settings
                 settings_query = f"""
-                    SELECT 
+                    SELECT
                         h.hypertable_name,
                         h.compression_enabled,
                         h.compression_status,
@@ -192,7 +192,7 @@ class CompressionManager:
                         pg_size_pretty(SUM(CASE WHEN c.is_compressed THEN c.total_bytes ELSE 0 END)) as compressed_size,
                         pg_size_pretty(SUM(CASE WHEN NOT c.is_compressed THEN c.total_bytes ELSE 0 END)) as uncompressed_size
                     FROM timescaledb_information.hypertables h
-                    LEFT JOIN timescaledb_information.chunks c 
+                    LEFT JOIN timescaledb_information.chunks c
                         ON h.hypertable_name = c.hypertable_name
                     WHERE h.hypertable_name = '{table_name}'
                     GROUP BY h.hypertable_name, h.compression_enabled, h.compression_status;
@@ -206,7 +206,7 @@ class CompressionManager:
 
                 # Get compression policy
                 policy_query = f"""
-                    SELECT 
+                    SELECT
                         j.job_id,
                         j.proc_name,
                         j.scheduled,
@@ -235,14 +235,6 @@ class CompressionManager:
 
                 # Calculate compression ratio
                 if row.compressed_chunks and row.compressed_chunks > 0:
-                    # Get actual sizes
-                    size_query = f"""
-                        SELECT 
-                            pg_total_relation_size('{table_name}') as total_size,
-                            pg_total_relation_size('{table_name}') FILTER (WHERE is_compressed = true) as compressed_size
-                        FROM timescaledb_information.chunks
-                        WHERE hypertable_name = '{table_name}';
-                    """
                     # Simplified calculation
                     if row.uncompressed_size and row.compressed_size:
                         try:
@@ -253,7 +245,7 @@ class CompressionManager:
                                     1 - compressed_bytes / uncompressed_bytes
                                 ) * 100
                                 status["compression_ratio"] = f"{ratio:.1f}%"
-                        except:
+                        except Exception:
                             pass
 
                 # Get policy info

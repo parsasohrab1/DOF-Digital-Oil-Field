@@ -296,7 +296,6 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
-    global retry_task, mqtt_client
     if retry_task:
         retry_task.cancel()
         try:

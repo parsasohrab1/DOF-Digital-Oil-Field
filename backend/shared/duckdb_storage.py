@@ -69,13 +69,13 @@ class DuckDBTimeSeriesStorage:
 
             # Create index for fast time-range queries
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_time_sensor 
+                CREATE INDEX IF NOT EXISTS idx_time_sensor
                 ON time_series_data(timestamp_us, sensor_id)
             """)
 
             # Create index for metric queries
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_metric 
+                CREATE INDEX IF NOT EXISTS idx_metric
                 ON time_series_data(metric_name, timestamp_us)
             """)
 
@@ -248,13 +248,13 @@ class DuckDBTimeSeriesStorage:
                         agg_func = aggregation.upper()
                         result = conn.execute(
                             """
-                            SELECT 
+                            SELECT
                                 {agg}(value) as value,
                                 MIN(timestamp_us) as start_timestamp_us,
                                 MAX(timestamp_us) as end_timestamp_us,
                                 COUNT(*) as count
                             FROM time_series_data
-                            WHERE sensor_id = ? 
+                            WHERE sensor_id = ?
                                 AND metric_name = ?
                                 AND timestamp_us >= ?
                                 AND timestamp_us <= ?
@@ -282,7 +282,7 @@ class DuckDBTimeSeriesStorage:
                             """
                             SELECT timestamp_us, value, quality, metadata
                             FROM time_series_data
-                            WHERE sensor_id = ? 
+                            WHERE sensor_id = ?
                                 AND metric_name = ?
                                 AND timestamp_us >= ?
                                 AND timestamp_us <= ?
@@ -385,7 +385,7 @@ class DuckDBTimeSeriesStorage:
 
                     # Time range
                     result = conn.execute("""
-                        SELECT MIN(timestamp_us), MAX(timestamp_us) 
+                        SELECT MIN(timestamp_us), MAX(timestamp_us)
                         FROM time_series_data
                     """)
                     time_range = result.fetchone()

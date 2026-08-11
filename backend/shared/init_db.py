@@ -43,7 +43,7 @@ def create_hypertables():
                 chunk_interval = settings.TIMESCALE_CHUNK_TIME_INTERVAL
                 conn.execute(text(f"""
                     SELECT create_hypertable(
-                        'sensor_data', 
+                        'sensor_data',
                         'timestamp',
                         chunk_time_interval => INTERVAL '{chunk_interval}',
                         if_not_exists => TRUE
@@ -59,7 +59,7 @@ def create_hypertables():
             chunk_interval = settings.TIMESCALE_CHUNK_TIME_INTERVAL
             conn.execute(text(f"""
                 SELECT create_hypertable(
-                    'sensor_data', 
+                    'sensor_data',
                     'timestamp',
                     chunk_time_interval => INTERVAL '{chunk_interval}',
                     if_not_exists => TRUE
@@ -82,7 +82,7 @@ def create_hypertables():
 
             # Create additional indexes for better query performance
             conn.execute(text("""
-                CREATE INDEX IF NOT EXISTS idx_sensor_data_tag_timestamp 
+                CREATE INDEX IF NOT EXISTS idx_sensor_data_tag_timestamp
                 ON sensor_data (tag_id, timestamp DESC);
             """))
             conn.commit()

@@ -10,14 +10,21 @@ exclude =
     dist,
     *.egg-info,
     migrations
+# E203: whitespace before ':'
+# E501: line too long (handled by max-line-length)
+# W503: line break before binary operator
+# F401: imported but unused (common in __init__.py)
+# F403: star imports (common in __init__.py)
+# F405: name may be undefined (from star imports)
+# E402: module level import not at top of file
 ignore =
-    E203,  # whitespace before ':'
-    E501,  # line too long (handled by max-line-length)
-    W503,  # line break before binary operator
-    F401,  # imported but unused (common in __init__.py)
-    F403,  # star imports (common in __init__.py)
-    F405,  # name may be undefined (from star imports)
-    E402   # module level import not at top of file
+    E203,
+    E501,
+    W503,
+    F401,
+    F403,
+    F405,
+    E402
 per-file-ignores =
     __init__.py:F401,F403,F405
     tests/*:E402

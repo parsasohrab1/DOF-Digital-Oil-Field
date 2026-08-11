@@ -152,7 +152,7 @@ class LoRaWANClient:
                     timestamp = datetime.fromisoformat(
                         received_at.replace("Z", "+00:00")
                     )
-                except:
+                except Exception:
                     timestamp = datetime.utcnow()
             else:
                 timestamp = datetime.utcnow()
