@@ -2,6 +2,7 @@
 Digital Twin Service
 Hosts engineering calculations, process simulations, and 3D BIM models
 """
+
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -16,14 +17,14 @@ import json
 
 from prometheus_client import Counter, Histogram
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "shared"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from logging_config import setup_logging  # type: ignore
-from metrics import setup_metrics  # type: ignore
-from tracing import setup_tracing  # type: ignore
-from config import settings
-from auth import require_authentication
-from database import get_timescale_db
+from shared.logging_config import setup_logging  # type: ignore
+from shared.metrics import setup_metrics  # type: ignore
+from shared.tracing import setup_tracing  # type: ignore
+from shared.config import settings
+from shared.auth import require_authentication
+from shared.database import get_timescale_db
 from sqlalchemy.orm import Session
 
 logger = setup_logging("digital-twin-service")
@@ -652,9 +653,11 @@ async def run_what_if_scenario(
             "integrity_risk": integrity_risk,
         },
         "recommendations": [
-            "Reduce choke adjustment if integrity risk is medium/high."
-            if integrity_risk != "low"
-            else "Scenario is operationally acceptable.",
+            (
+                "Reduce choke adjustment if integrity risk is medium/high."
+                if integrity_risk != "low"
+                else "Scenario is operationally acceptable."
+            ),
             "Monitor pressure transient in first 2 hours after applying setpoints.",
         ],
         "timeline": [

@@ -12,4 +12,8 @@ opentelemetry-instrumentation-fastapi==0.41b0
 opentelemetry-instrumentation-httpx==0.41b0
 opentelemetry-instrumentation-requests==0.41b0
 PyJWT==2.8.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+pyotp==2.9.0
+fastavro==1.9.4
 httpx==0.25.2

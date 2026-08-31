@@ -1,4 +1,5 @@
 """Unit tests for shared.security_alerts (memory + fake Redis)."""
+
 from datetime import datetime, timedelta
 
 import pytest
@@ -22,7 +23,9 @@ class FakeRedis:
 
 
 def _memory_alerts(threshold: int = 3) -> SecurityAlerts:
-    alerts = SecurityAlerts(redis_url="redis://invalid-host:6379/0", threshold=threshold)
+    alerts = SecurityAlerts(
+        redis_url="redis://invalid-host:6379/0", threshold=threshold
+    )
     alerts.redis_client = None
     alerts.memory_store = {}
     return alerts

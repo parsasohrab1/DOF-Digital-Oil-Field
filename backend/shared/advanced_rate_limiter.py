@@ -2,6 +2,7 @@
 Advanced Rate Limiting with Multiple Strategies
 Rate limiting سخت‌گیرانه‌تر با استراتژی‌های مختلف
 """
+
 import time
 import logging
 from typing import Dict, Optional, Tuple
@@ -43,9 +44,9 @@ class AdvancedRateLimiter:
 
         # In-memory fallback
         self.memory_store: Dict[str, list] = defaultdict(list)
-        self.token_buckets: Dict[
-            str, Tuple[float, float]
-        ] = {}  # key -> (tokens, last_update)
+        self.token_buckets: Dict[str, Tuple[float, float]] = (
+            {}
+        )  # key -> (tokens, last_update)
         self.lock = asyncio.Lock()
 
     def _get_key(self, identifier: str, endpoint: Optional[str] = None) -> str:

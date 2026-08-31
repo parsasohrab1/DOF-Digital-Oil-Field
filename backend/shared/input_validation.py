@@ -1,6 +1,7 @@
 """
 Centralized input validation for XSS/SQLi and injection hardening.
 """
+
 import re
 from typing import Any, Iterable, List, Pattern
 

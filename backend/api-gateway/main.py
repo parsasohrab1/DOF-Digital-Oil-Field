@@ -2,6 +2,7 @@
 API Gateway Service
 Single entry point for all UI and API requests
 """
+
 from fastapi import (
     FastAPI,
     Request,
@@ -158,8 +159,14 @@ SAFE_HEADERS_ALLOWLIST = {
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
+PUBLIC_AUTH_PATHS = {"api/auth/token", "api/auth/refresh", "api/auth/health"}
+
+
 async def authenticate_request(request: Request):
     """Validate authentication token"""
+    if request.url.path.strip("/") in PUBLIC_AUTH_PATHS:
+        return None
+
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         raise HTTPException(status_code=401, detail="Missing authorization token")
@@ -302,6 +309,8 @@ async def enforce_zero_trust(request: Request, service_name: str):
     """Apply zero-trust checks before service proxying."""
     if not settings.ZERO_TRUST_ENFORCED:
         return True
+    if request.url.path.strip("/") in PUBLIC_AUTH_PATHS:
+        return True
 
     ip = _client_ip(request)
     if not _ip_allowed_in_zero_trust(ip):
@@ -433,7 +442,9 @@ async def kpi_feature_usage(payload: Dict[str, Any]):
     if not feature or len(feature) > 128:
         raise HTTPException(status_code=400, detail="Invalid feature name")
     if contains_suspicious_content(feature):
-        raise HTTPException(status_code=400, detail="Request contains blocked input patterns")
+        raise HTTPException(
+            status_code=400, detail="Request contains blocked input patterns"
+        )
     record_feature_usage(feature)
     return {"recorded": True, "feature": feature}
 
@@ -481,6 +492,52 @@ async def get_threat_status():
         "api_security_hardening": settings.API_SECURITY_ENABLE_INPUT_HARDENING,
         "siem_summary": siem_logger.summary(),
     }
+
+
+class RealtimeBroadcaster:
+    """Fan-out for pushed realtime events to every connected WebSocket client.
+
+    Replaces the previous design where the gateway itself polled
+    data-ingestion-service's REST endpoint once a second (a full poll
+    interval plus an HTTP round-trip of added latency, regardless of how
+    fresh the data actually was). Services now push new data here directly
+    (see POST /internal/realtime/publish) and every subscriber queue gets it
+    immediately.
+    """
+
+    def __init__(self) -> None:
+        self._subscribers: set = set()
+
+    def subscribe(self) -> "asyncio.Queue":
+        queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+        self._subscribers.add(queue)
+        return queue
+
+    def unsubscribe(self, queue: "asyncio.Queue") -> None:
+        self._subscribers.discard(queue)
+
+    def publish(self, payload: Dict[str, Any]) -> None:
+        for queue in list(self._subscribers):
+            try:
+                queue.put_nowait(payload)
+            except asyncio.QueueFull:
+                # Slow consumer: drop the oldest pending event rather than
+                # blocking the publisher or growing unbounded.
+                try:
+                    queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+                try:
+                    queue.put_nowait(payload)
+                except asyncio.QueueFull:
+                    pass
+
+
+realtime_broadcaster = RealtimeBroadcaster()
+# Fallback cadence for the WebSocket loop when nothing has been pushed
+# recently (keeps alerts/heartbeat fresh even for idle wells). This is a
+# safety net, not the primary delivery path anymore.
+REALTIME_FALLBACK_POLL_SECONDS = 10.0
 
 
 async def _fetch_realtime_snapshot() -> Dict[str, Any]:
@@ -539,14 +596,43 @@ async def realtime_websocket(websocket: WebSocket, token: str = Query(default=""
     await websocket.accept()
     logger.info("Realtime WebSocket connected")
 
+    queue = realtime_broadcaster.subscribe()
+
     async def sender_loop() -> None:
         while True:
-            snapshot = await _fetch_realtime_snapshot()
-            await websocket.send_json(snapshot)
-            await asyncio.sleep(1.0)
+            try:
+                # Primary path: forward pushed events (e.g. from
+                # data-ingestion-service) the instant they arrive.
+                pushed = await asyncio.wait_for(
+                    queue.get(), timeout=REALTIME_FALLBACK_POLL_SECONDS
+                )
+                await websocket.send_json(pushed)
+            except asyncio.TimeoutError:
+                # Nothing pushed recently: fall back to a snapshot so alerts
+                # and the connection heartbeat stay current for idle wells.
+                snapshot = await _fetch_realtime_snapshot()
+                await websocket.send_json(snapshot)
 
+    async def receiver_loop() -> None:
+        # sender_loop only ever sends, so without this the client's
+        # disconnect would go unnoticed for up to REALTIME_FALLBACK_POLL_SECONDS
+        # (until the next send() happens to fail) instead of being detected
+        # immediately.
+        while True:
+            message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                raise WebSocketDisconnect(message.get("code", 1000))
+
+    sender_task = asyncio.ensure_future(sender_loop())
+    receiver_task = asyncio.ensure_future(receiver_loop())
     try:
-        await sender_loop()
+        done, pending = await asyncio.wait(
+            {sender_task, receiver_task}, return_when=asyncio.FIRST_EXCEPTION
+        )
+        for task in pending:
+            task.cancel()
+        for task in done:
+            task.result()
     except WebSocketDisconnect:
         logger.info("Realtime WebSocket disconnected")
     except Exception as exc:
@@ -555,6 +641,36 @@ async def realtime_websocket(websocket: WebSocket, token: str = Query(default=""
             await websocket.close(code=1011, reason="Internal stream error")
         except Exception:
             pass
+    finally:
+        realtime_broadcaster.unsubscribe(queue)
+
+
+@app.post("/internal/realtime/publish")
+async def publish_realtime_event(request: Request):
+    """Internal push endpoint for services to feed the realtime WebSocket stream.
+
+    Not part of the public API surface: it bypasses authenticate_request /
+    enforce_zero_trust (those only wrap the /api/{service}/{path} proxy
+    route) and instead checks a shared internal service token, since this
+    lets the caller broadcast arbitrary data straight to every connected
+    dashboard client.
+    """
+    internal_token = request.headers.get("X-Internal-Token", "")
+    if not internal_token or internal_token != settings.INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid internal service token")
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Malformed JSON payload")
+
+    payload = {
+        "type": body.get("type", "push"),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "data": body.get("data", {}),
+    }
+    realtime_broadcaster.publish(payload)
+    return {"status": "published"}
 
 
 @app.get("/stream/realtime/sse")
@@ -725,9 +841,11 @@ async def proxy_request(
 
     risk_score, reasons = threat_detector.evaluate(
         ip=_client_ip(request),
-        user=(request.state.user or {}).get("sub")
-        if hasattr(request.state, "user")
-        else None,
+        user=(
+            (request.state.user or {}).get("sub")
+            if hasattr(request.state, "user")
+            else None
+        ),
         path=request.url.path,
         method=request.method,
         status_code=response.status_code,

@@ -306,13 +306,43 @@ export const mlAPI = {
     return response.data
   },
 
-  setDriftBaseline: async (modelType: string, features: Record<string, number>) => {
+  setDriftBaseline: async (modelType: string, features: Record<string, number>[]) => {
+    // Backend expects a batch of historical samples (List[Dict[str, float]])
+    // to compute a mean/stddev baseline -- a single reading isn't a distribution.
     const response = await apiClient.post(`/api/ml-inference/models/${modelType}/drift/baseline`, { features })
     return response.data
   },
 
-  detectDrift: async (modelType: string, features: Record<string, number>, threshold: number = 2.0) => {
+  detectDrift: async (modelType: string, features: Record<string, number>[], threshold: number = 2.0) => {
     const response = await apiClient.post(`/api/ml-inference/models/${modelType}/drift/detect`, { features, threshold })
+    return response.data
+  },
+}
+
+// Federated Learning API
+export const federatedAPI = {
+  getNodes: async () => {
+    const response = await apiClient.get('/api/ml-inference/federated/nodes')
+    return response.data
+  },
+
+  getGlobalModel: async () => {
+    const response = await apiClient.get('/api/ml-inference/federated/global-model')
+    return response.data
+  },
+
+  trainAndSubmit: async (nodeId: string, payload: {
+    well_name: string
+    location: string
+    samples: Record<string, number>[]
+    labels: number[]
+  }) => {
+    const response = await apiClient.post(`/api/ml-inference/federated/nodes/${nodeId}/train-and-submit`, payload)
+    return response.data
+  },
+
+  aggregate: async (minNodes: number = 2) => {
+    const response = await apiClient.post('/api/ml-inference/federated/aggregate', { min_nodes: minNodes })
     return response.data
   },
 }
@@ -595,6 +625,7 @@ export default {
   commands: commandAPI,
   reports: reportingAPI,
   ml: mlAPI,
+  federated: federatedAPI,
   digitalTwin: digitalTwinAPI,
   dvr: dvrAPI,
   remoteOps: remoteOpsAPI,

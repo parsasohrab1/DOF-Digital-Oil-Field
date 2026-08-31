@@ -2,6 +2,7 @@
 DuckDB-based Time-Series Storage for Edge Computing
 Lightweight time-series database for offline resilience and fast data recovery
 """
+
 import json
 import logging
 import threading
@@ -54,8 +55,7 @@ class DuckDBTimeSeriesStorage:
         """Initialize DuckDB database with time-series optimized schema"""
         with self._get_connection() as conn:
             # Create time-series table with partitioning by time
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS time_series_data (
                     timestamp_us BIGINT NOT NULL,
                     sensor_id VARCHAR NOT NULL,
@@ -65,35 +65,28 @@ class DuckDBTimeSeriesStorage:
                     metadata VARCHAR,
                     PRIMARY KEY (timestamp_us, sensor_id, metric_name)
                 )
-            """
-            )
+            """)
 
             # Create index for fast time-range queries
-            conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_time_sensor 
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_time_sensor
                 ON time_series_data(timestamp_us, sensor_id)
-            """
-            )
+            """)
 
             # Create index for metric queries
-            conn.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_metric 
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_metric
                 ON time_series_data(metric_name, timestamp_us)
-            """
-            )
+            """)
 
             # Create metadata table
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS storage_metadata (
                     key VARCHAR PRIMARY KEY,
                     value VARCHAR NOT NULL,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """
-            )
+            """)
 
             # Enable compression if requested
             if self.enable_compression:
@@ -255,19 +248,17 @@ class DuckDBTimeSeriesStorage:
                         agg_func = aggregation.upper()
                         result = conn.execute(
                             """
-                            SELECT 
+                            SELECT
                                 {agg}(value) as value,
                                 MIN(timestamp_us) as start_timestamp_us,
                                 MAX(timestamp_us) as end_timestamp_us,
                                 COUNT(*) as count
                             FROM time_series_data
-                            WHERE sensor_id = ? 
+                            WHERE sensor_id = ?
                                 AND metric_name = ?
                                 AND timestamp_us >= ?
                                 AND timestamp_us <= ?
-                        """.format(
-                                agg=agg_func
-                            ),
+                        """.format(agg=agg_func),
                             (sensor_id, metric_name, start_us, end_us),
                         )
 
@@ -291,7 +282,7 @@ class DuckDBTimeSeriesStorage:
                             """
                             SELECT timestamp_us, value, quality, metadata
                             FROM time_series_data
-                            WHERE sensor_id = ? 
+                            WHERE sensor_id = ?
                                 AND metric_name = ?
                                 AND timestamp_us >= ?
                                 AND timestamp_us <= ?
@@ -393,12 +384,10 @@ class DuckDBTimeSeriesStorage:
                     unique_metrics = result.fetchone()[0]
 
                     # Time range
-                    result = conn.execute(
-                        """
-                        SELECT MIN(timestamp_us), MAX(timestamp_us) 
+                    result = conn.execute("""
+                        SELECT MIN(timestamp_us), MAX(timestamp_us)
                         FROM time_series_data
-                    """
-                    )
+                    """)
                     time_range = result.fetchone()
                     min_time = time_range[0] / 1_000_000 if time_range[0] else None
                     max_time = time_range[1] / 1_000_000 if time_range[1] else None
@@ -413,15 +402,17 @@ class DuckDBTimeSeriesStorage:
                         "time_range": {
                             "start": min_time,
                             "end": max_time,
-                            "duration_seconds": max_time - min_time
-                            if (min_time and max_time)
-                            else None,
+                            "duration_seconds": (
+                                max_time - min_time if (min_time and max_time) else None
+                            ),
                         },
                         "storage_size_mb": round(db_size, 2),
                         "max_size_mb": self.max_size_mb,
-                        "usage_percent": round((db_size / self.max_size_mb) * 100, 2)
-                        if self.max_size_mb > 0
-                        else 0,
+                        "usage_percent": (
+                            round((db_size / self.max_size_mb) * 100, 2)
+                            if self.max_size_mb > 0
+                            else 0
+                        ),
                     }
             except Exception as e:
                 logger.error(f"Failed to get storage stats: {e}")
@@ -527,12 +518,10 @@ class DuckDBTimeSeriesStorage:
         """
         try:
             with self._get_connection() as conn:
-                result = conn.execute(
-                    f"""
+                result = conn.execute(f"""
                     INSERT INTO time_series_data
                     SELECT * FROM read_parquet('{input_path}')
-                """
-                )
+                """)
                 imported = result.rowcount
                 logger.info(f"Imported {imported} records from {input_path}")
                 return imported

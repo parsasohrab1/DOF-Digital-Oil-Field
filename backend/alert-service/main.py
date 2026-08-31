@@ -2,6 +2,7 @@
 Alert Service
 Manages alert rules, de-duplication, escalation, and silencing
 """
+
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,7 +13,7 @@ import sys
 import os
 import uuid
 
-# Add backend directory to path so `shared` can be imported as a package
+# Add shared module to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.database import get_db
@@ -49,6 +50,10 @@ alert_producer = None
 ALERT_CORRELATION_WINDOW_MINUTES = int(
     os.getenv("ALERT_CORRELATION_WINDOW_MINUTES", "15")
 )
+# Minimum number of distinct wells firing the same rule inside the correlation
+# window before we suspect a shared/systemic cause (SCADA outage, weather,
+# upstream equipment) rather than N independent well-local faults.
+ALERT_CROSS_WELL_MIN_WELLS = int(os.getenv("ALERT_CROSS_WELL_MIN_WELLS", "3"))
 ALERT_FATIGUE_COOLDOWN_SECONDS = {
     "critical": int(os.getenv("ALERT_FATIGUE_COOLDOWN_CRITICAL", "60")),
     "warning": int(os.getenv("ALERT_FATIGUE_COOLDOWN_WARNING", "180")),
@@ -66,7 +71,6 @@ from sms_notify import (  # noqa: E402
     sms_provider_status,
     SMS_OUTBOX,
 )
-
 
 
 class AlertCreate(BaseModel):
@@ -150,6 +154,8 @@ def _severity_rank(severity: str) -> int:
 def _default_metadata() -> Dict[str, Any]:
     return {
         "correlation_id": None,
+        "facility_correlation_id": None,
+        "cross_well_signal": None,
         "first_seen_at": None,
         "last_seen_at": None,
         "occurrence_count": 0,
@@ -181,13 +187,42 @@ def _derive_correlation_key(alert: AlertCreate) -> str:
     return f"{well}:{rule}:{sensor}"
 
 
-def _infer_rca(candidates: List[Alert]) -> Dict[str, Any]:
+def _find_cross_well_candidates(
+    db: Session, alert: Alert, window_minutes: int
+) -> List[Alert]:
+    """Find alerts firing the same rule on OTHER wells within the correlation window.
+
+    Same-well correlation (`_derive_correlation_key` / `correlation_id`) only ever
+    looks at `Alert.well_name == alert.well_name`, so a fault shared across the
+    facility (a SCADA gateway outage, a weather event, a bad sensor batch) shows
+    up as N unrelated per-well incidents instead of one systemic one. This looks
+    across all wells for the same rule to surface that pattern.
+    """
+    cutoff = datetime.utcnow() - timedelta(minutes=window_minutes)
+    return (
+        db.query(Alert)
+        .filter(
+            Alert.rule_name == alert.rule_name,
+            Alert.timestamp >= cutoff,
+        )
+        .order_by(Alert.timestamp.desc())
+        .limit(200)
+        .all()
+    )
+
+
+def _infer_rca(
+    candidates: List[Alert],
+    cross_well_candidates: Optional[List[Alert]] = None,
+) -> Dict[str, Any]:
     if not candidates:
         return {
             "suspected_root_cause": "insufficient_data",
             "confidence": 0.2,
             "reasoning": "Not enough related alerts to infer RCA.",
             "contributing_alerts": [],
+            "scope": "well",
+            "distinct_wells": 0,
         }
 
     by_rule: Dict[str, int] = {}
@@ -202,13 +237,45 @@ def _infer_rca(candidates: List[Alert]) -> Dict[str, Any]:
     top_rule = max(by_rule, key=by_rule.get)
     top_sensor = max(by_sensor, key=by_sensor.get)
     confidence = min(0.95, 0.4 + (by_rule[top_rule] / max(1, len(candidates))) * 0.5)
-    return {
+
+    well_local_result = {
         "suspected_root_cause": f"{top_rule}:{top_sensor}",
         "confidence": round(confidence, 2),
         "reasoning": (
             f"Dominant rule '{top_rule}' observed {by_rule[top_rule]} times with max severity '{max_severity}'."
         ),
         "contributing_alerts": [a.alert_id for a in candidates[:10]],
+        "scope": "well",
+        "distinct_wells": len({a.well_name for a in candidates}),
+    }
+
+    if not cross_well_candidates:
+        return well_local_result
+
+    distinct_wells = {a.well_name for a in cross_well_candidates}
+    if len(distinct_wells) < ALERT_CROSS_WELL_MIN_WELLS:
+        return well_local_result
+
+    cross_max_severity = "info"
+    for a in cross_well_candidates:
+        if _severity_rank(a.severity) > _severity_rank(cross_max_severity):
+            cross_max_severity = a.severity
+    cross_confidence = min(0.95, 0.5 + (len(distinct_wells) / 20))
+    rule_name = cross_well_candidates[0].rule_name
+    return {
+        "suspected_root_cause": f"systemic:{rule_name}",
+        "confidence": round(cross_confidence, 2),
+        "reasoning": (
+            f"Rule '{rule_name}' fired across {len(distinct_wells)} distinct wells "
+            f"within the correlation window (max severity '{cross_max_severity}'). "
+            "This many independent wells sharing the same rule at the same time "
+            "suggests a shared upstream cause (SCADA/network outage, weather event, "
+            "sensor batch defect) rather than separate well-local faults."
+        ),
+        "contributing_alerts": [a.alert_id for a in cross_well_candidates[:10]],
+        "scope": "facility",
+        "distinct_wells": len(distinct_wells),
+        "affected_wells": sorted(distinct_wells)[:20],
     }
 
 
@@ -353,12 +420,46 @@ async def create_alert(
             f"corr-{uuid.uuid4().hex[:12]}-{_derive_correlation_key(alert)}"
         )
 
+    # Cross-well correlation: the same rule firing on several other wells inside
+    # the window suggests a shared/systemic cause rather than N unrelated
+    # well-local faults. Kept as a separate facility_correlation_id so per-well
+    # triage (correlation_id above) is unaffected.
+    cross_well_related = _find_cross_well_candidates(
+        db, alert, ALERT_CORRELATION_WINDOW_MINUTES
+    )
+    distinct_wells = {a.well_name for a in cross_well_related} | {alert.well_name}
+    facility_correlation_id = None
+    if len(distinct_wells) >= ALERT_CROSS_WELL_MIN_WELLS:
+        for related_alert in cross_well_related:
+            meta = _merge_metadata(related_alert.metadata_json)
+            existing_facility_id = meta.get("facility_correlation_id")
+            if existing_facility_id:
+                facility_correlation_id = existing_facility_id
+                break
+        if not facility_correlation_id:
+            facility_correlation_id = (
+                f"facility-{uuid.uuid4().hex[:12]}-{alert.rule_name}"
+            )
+            # This alert is the one that crossed the threshold: backfill the
+            # newly-minted id onto the earlier alerts that made up the signal,
+            # so the cluster is visible as a whole and not just from here on.
+            for related_alert in cross_well_related:
+                related_meta = _merge_metadata(related_alert.metadata_json)
+                if not related_meta.get("facility_correlation_id"):
+                    related_meta["facility_correlation_id"] = facility_correlation_id
+                    related_meta["cross_well_signal"] = {
+                        "distinct_wells": len(distinct_wells),
+                        "affected_wells": sorted(distinct_wells)[:20],
+                    }
+                    related_alert.metadata_json = related_meta
+
     # Create alert
     now_iso = datetime.utcnow().isoformat()
     metadata_json = _default_metadata()
     metadata_json.update(
         {
             "correlation_id": correlation_id,
+            "facility_correlation_id": facility_correlation_id,
             "first_seen_at": now_iso,
             "last_seen_at": now_iso,
             "occurrence_count": 1,
@@ -373,6 +474,14 @@ async def create_alert(
                 "window_minutes": ALERT_CORRELATION_WINDOW_MINUTES,
                 "related_alert_candidates": [a.alert_id for a in related[:10]],
             },
+            "cross_well_signal": (
+                {
+                    "distinct_wells": len(distinct_wells),
+                    "affected_wells": sorted(distinct_wells)[:20],
+                }
+                if facility_correlation_id
+                else None
+            ),
         }
     )
 
@@ -580,6 +689,62 @@ async def list_correlated_alerts(
     return {"groups": grouped, "count": len(grouped)}
 
 
+@app.get("/alerts/correlations/facility")
+async def list_facility_correlated_alerts(
+    status: str = "open",
+    limit: int = 200,
+    db: Session = Depends(get_db),
+    _: Dict[str, Any] = Depends(require_alert_read),
+):
+    """List cross-well alert clusters that share a facility_correlation_id.
+
+    Complements /alerts/correlations (which groups by well-scoped
+    correlation_id) by surfacing incidents where the same rule fired across
+    several wells at once — a signal of a shared/systemic cause rather than
+    independent well-local faults.
+    """
+    alerts = (
+        db.query(Alert)
+        .filter(Alert.status == status)
+        .order_by(Alert.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+    groups: Dict[str, Dict[str, Any]] = {}
+    for alert in alerts:
+        meta = _merge_metadata(alert.metadata_json)
+        facility_id = meta.get("facility_correlation_id")
+        if not facility_id:
+            continue
+        if facility_id not in groups:
+            groups[facility_id] = {
+                "facility_correlation_id": facility_id,
+                "rule_name": alert.rule_name,
+                "wells": set(),
+                "alerts": [],
+                "count": 0,
+                "max_severity": alert.severity,
+            }
+        groups[facility_id]["wells"].add(alert.well_name)
+        groups[facility_id]["alerts"].append(alert.alert_id)
+        groups[facility_id]["count"] += 1
+        if _severity_rank(alert.severity) > _severity_rank(
+            groups[facility_id]["max_severity"]
+        ):
+            groups[facility_id]["max_severity"] = alert.severity
+
+    grouped = []
+    for group in groups.values():
+        group["wells"] = sorted(group["wells"])
+        group["distinct_wells"] = len(group["wells"])
+        grouped.append(group)
+    grouped.sort(
+        key=lambda x: (x["distinct_wells"], _severity_rank(x["max_severity"])),
+        reverse=True,
+    )
+    return {"groups": grouped, "count": len(grouped)}
+
+
 @app.post("/alerts/{alert_id}/rca")
 async def run_alert_rca(
     alert_id: str,
@@ -592,9 +757,8 @@ async def run_alert_rca(
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
 
-    lookback_start = datetime.utcnow() - timedelta(
-        minutes=max(5, request.lookback_minutes)
-    )
+    lookback_minutes = max(5, request.lookback_minutes)
+    lookback_start = datetime.utcnow() - timedelta(minutes=lookback_minutes)
     candidates = (
         db.query(Alert)
         .filter(
@@ -605,12 +769,13 @@ async def run_alert_rca(
         .limit(100)
         .all()
     )
+    cross_well_candidates = _find_cross_well_candidates(db, alert, lookback_minutes)
 
-    rca = _infer_rca(candidates)
+    rca = _infer_rca(candidates, cross_well_candidates)
     metadata = _merge_metadata(alert.metadata_json)
     metadata["rca"] = {
         "generated_at": datetime.utcnow().isoformat(),
-        "lookback_minutes": max(5, request.lookback_minutes),
+        "lookback_minutes": lookback_minutes,
         **rca,
     }
     alert.metadata_json = metadata
@@ -619,6 +784,7 @@ async def run_alert_rca(
     return {
         "alert_id": alert_id,
         "correlation_id": metadata.get("correlation_id"),
+        "facility_correlation_id": metadata.get("facility_correlation_id"),
         "rca": metadata["rca"],
     }
 

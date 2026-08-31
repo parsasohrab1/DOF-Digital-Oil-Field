@@ -1,20 +1,36 @@
-import os
-import sys
-
 import pytest
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "auth-service"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-gateway"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "alert-service"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "reporting-service"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "digital-twin-service"))
+# Reuse the FastAPI apps already loaded by the per-service test modules rather
+# than re-executing each service's main.py a second time: prometheus_client's
+# default CollectorRegistry is a process-wide singleton, so loading the same
+# main.py twice in one pytest run (e.g. once here, once in
+# test_digital_twin_service.py) registers the same metric names twice and
+# raises "Duplicated timeseries in CollectorRegistry".
+from tests.test_auth_service import app as auth_app
+from tests.test_api_gateway import api_gateway
+from tests.test_alert_service import app as alert_app
+from tests.test_reporting_service import app as reporting_app
+from tests.test_digital_twin_service import app as twin_app
+from shared.database import get_db
 
-from main import app as auth_app  # type: ignore
-from backend.api-gateway.main import app as gateway_app  # type: ignore
-from backend.alert-service.main import app as alert_app  # type: ignore
-from backend.reporting-service.main import app as reporting_app  # type: ignore
-from backend.digital-twin-service.main import app as twin_app  # type: ignore
+gateway_app = api_gateway.app
+
+
+@pytest.fixture(autouse=True)
+def _override_alert_health_db(test_db):
+    # alert-service's /health queries the DB (open alert count), so it needs
+    # the same sqlite test_db every other suite uses instead of the real
+    # Postgres connection string from settings.
+    def _get_db():
+        try:
+            yield test_db
+        finally:
+            pass
+
+    alert_app.dependency_overrides[get_db] = _get_db
+    yield
+    alert_app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.mark.smoke

@@ -5,7 +5,6 @@ import pytest
 import httpx
 from fastapi.testclient import TestClient
 
-
 MODULE_PATH = Path(__file__).resolve().parents[1] / "api-gateway" / "main.py"
 spec = importlib.util.spec_from_file_location("api_gateway", MODULE_PATH)
 api_gateway = importlib.util.module_from_spec(spec)
@@ -217,3 +216,50 @@ def test_security_threat_status_endpoint():
     assert "zero_trust_enforced" in body
     assert "api_security_hardening" in body
     assert "threat_block_threshold" in body
+
+
+def test_internal_realtime_publish_rejects_wrong_token():
+    response = client.post(
+        "/internal/realtime/publish",
+        headers={"X-Internal-Token": "not-the-real-token"},
+        json={"type": "sensor_data", "data": {"sensor_records": []}},
+    )
+    assert response.status_code == 401
+
+
+def test_realtime_websocket_delivers_pushed_event_immediately():
+    """Regression test for data-ingestion -> Gateway WebSocket wiring.
+
+    Previously the WebSocket loop only ever polled data-ingestion's REST
+    endpoint once a second; a service pushing to /internal/realtime/publish
+    must now reach a connected client without waiting for that poll cycle.
+    """
+    from shared.security import create_access_token
+
+    token = create_access_token(data={"sub": "test-user", "role": "field_operator"})
+
+    with client.websocket_connect(f"/stream/realtime/ws?token={token}") as websocket:
+        publish_response = client.post(
+            "/internal/realtime/publish",
+            headers={"X-Internal-Token": api_gateway.settings.INTERNAL_SERVICE_TOKEN},
+            json={
+                "type": "sensor_data",
+                "data": {
+                    "sensor_records": [{"sensor_id": "WELL-1-pressure", "value": 123.4}]
+                },
+            },
+        )
+        assert publish_response.status_code == 200
+
+        # The fallback heartbeat snapshot (sent when nothing has been
+        # pushed recently) can legitimately interleave with the pushed
+        # event depending on scheduling, so scan a bounded number of
+        # messages rather than assuming the very first one is ours.
+        message = None
+        for _ in range(5):
+            candidate = websocket.receive_json()
+            if candidate.get("type") == "sensor_data":
+                message = candidate
+                break
+        assert message is not None, "sensor_data event was never delivered"
+        assert message["data"]["sensor_records"][0]["sensor_id"] == "WELL-1-pressure"

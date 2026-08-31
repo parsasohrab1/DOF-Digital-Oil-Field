@@ -2,6 +2,7 @@
 ERP Integration Service
 Integrates with enterprise systems (SAP, Oracle, etc.) for automated work orders
 """
+
 import asyncio
 import json
 import os
@@ -15,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
 
-# Add backend directory to path so `shared` can be imported as a package
+# Add shared module to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.config import settings

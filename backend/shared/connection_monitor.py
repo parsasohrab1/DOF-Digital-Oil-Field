@@ -1,6 +1,7 @@
 """
 Connection Monitor for detecting online/offline status
 """
+
 import logging
 import socket
 import time

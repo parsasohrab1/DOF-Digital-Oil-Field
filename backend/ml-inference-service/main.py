@@ -2,6 +2,7 @@
 ML Inference Service
 Provides low-latency model inference for anomaly detection and failure prediction
 """
+
 import os
 import sys
 import time
@@ -13,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
 import numpy as np
 
-# Add backend directory to path so `shared` can be imported as a package
+# Add shared module to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.config import settings
@@ -22,6 +23,15 @@ from shared.auth import require_roles
 from shared.metrics import setup_metrics
 from shared.tracing import setup_tracing
 from rul_model import rul_model_manager
+from federated_learning import (
+    federated_coordinator,
+    train_local_linear_model,
+    WEIGHT_DIM,
+    FEATURE_NAMES,
+)
+
+# Setup logging
+logger = setup_logging("ml-inference-service")
 
 # Setup logging
 logger = setup_logging("ml-inference-service")
@@ -182,6 +192,25 @@ class DriftDetectRequest(BaseModel):
         if isinstance(value, dict):
             return [value]
         return value
+
+
+class FederatedNodeUpdateRequest(BaseModel):
+    well_name: str
+    location: str
+    local_weights: List[float]
+    local_accuracy: float
+    data_size: int
+
+
+class FederatedLocalTrainRequest(BaseModel):
+    well_name: str
+    location: str
+    samples: List[Dict[str, float]]
+    labels: List[float]
+
+
+class FederatedAggregateRequest(BaseModel):
+    min_nodes: int = 2
 
 
 @app.on_event("startup")
@@ -739,6 +768,104 @@ async def detect_drift(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Drift detection failed: {exc}")
+
+
+@app.post("/federated/nodes/{node_id}/update")
+async def submit_federated_update(
+    node_id: str,
+    request: FederatedNodeUpdateRequest,
+    _: Dict[str, Any] = Depends(
+        require_roles({"system_admin", "data_engineer", "field_operator"})
+    ),
+):
+    """Register an edge node's local model update (weights only, never raw data)."""
+    try:
+        node = federated_coordinator.submit_local_update(
+            node_id=node_id,
+            well_name=request.well_name,
+            location=request.location,
+            local_weights=request.local_weights,
+            local_accuracy=request.local_accuracy,
+            data_size=request.data_size,
+        )
+        return {
+            "node_id": node.node_id,
+            "well_name": node.well_name,
+            "location": node.location,
+            "local_accuracy": node.local_accuracy,
+            "data_size": node.data_size,
+            "status": node.status,
+            "last_sync": node.last_sync,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/federated/nodes/{node_id}/train-and-submit")
+async def train_and_submit_federated_update(
+    node_id: str,
+    request: FederatedLocalTrainRequest,
+    _: Dict[str, Any] = Depends(
+        require_roles({"system_admin", "data_engineer", "field_operator"})
+    ),
+):
+    """Fit a local model on this node's own samples and submit only the
+    resulting weights -- the samples/labels in the request body are what an
+    edge node would otherwise keep entirely local; this endpoint exists so
+    the training step can be exercised/demonstrated centrally too."""
+    try:
+        trained = train_local_linear_model(request.samples, request.labels)
+        node = federated_coordinator.submit_local_update(
+            node_id=node_id,
+            well_name=request.well_name,
+            location=request.location,
+            local_weights=trained["local_weights"],
+            local_accuracy=trained["local_accuracy"],
+            data_size=trained["data_size"],
+        )
+        return {
+            "node_id": node.node_id,
+            "local_accuracy": node.local_accuracy,
+            "data_size": node.data_size,
+            "status": node.status,
+            "last_sync": node.last_sync,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/federated/aggregate")
+async def aggregate_federated_round(
+    request: FederatedAggregateRequest,
+    _: Dict[str, Any] = Depends(require_roles({"system_admin"})),
+):
+    """Run one FedAvg aggregation round over all currently-registered nodes."""
+    try:
+        return federated_coordinator.aggregate_round(min_nodes=request.min_nodes)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/federated/nodes")
+async def list_federated_nodes(
+    _: Dict[str, Any] = Depends(
+        require_roles({"system_admin", "data_engineer", "field_operator"})
+    ),
+):
+    return {"nodes": federated_coordinator.get_state()["nodes"]}
+
+
+@app.get("/federated/global-model")
+async def get_federated_global_model(
+    _: Dict[str, Any] = Depends(
+        require_roles({"system_admin", "data_engineer", "field_operator"})
+    ),
+):
+    state = federated_coordinator.get_state()
+    return {
+        "global_model": state["global_model"],
+        "round_history": state["round_history"],
+    }
 
 
 @app.get("/health")

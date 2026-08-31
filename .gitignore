@@ -16,6 +16,7 @@ build/
 .pytest_cache/
 .coverage
 htmlcov/
+mlruns/
 
 # Node
 node_modules/

@@ -2,6 +2,7 @@
 Data Variables Service
 Manages 65+ data variables with different sampling rates
 """
+
 import os
 import sys
 from typing import List, Optional

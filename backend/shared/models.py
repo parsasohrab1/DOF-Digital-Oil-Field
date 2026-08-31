@@ -1,6 +1,7 @@
 """
 Shared database models
 """
+
 from sqlalchemy import (
     Column,
     String,

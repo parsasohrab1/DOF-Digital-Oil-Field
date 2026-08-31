@@ -1,120 +1,104 @@
-import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts'
+import { federatedAPI } from '../api/services'
 import './FederatedLearning.css'
 
-interface EdgeNode {
-  nodeId: string
-  location: string
-  wellName: string
-  modelVersion: string
-  localAccuracy: number
-  dataSize: number // MB
-  trainingStatus: 'training' | 'idle' | 'syncing'
-  lastSync: string
-  bandwidthSaved: number // MB
+// Fixed feature schema the backend's local models are trained/averaged on
+// (backend/ml-inference-service/federated_learning.py FEATURE_NAMES). Kept
+// here only to generate a demo dataset client-side -- the values themselves
+// never need to match any real sensor scale, since this is purely to show
+// real local training + FedAvg aggregation running end to end.
+const FEATURES = ['pressure', 'temperature', 'flow_rate', 'vibration']
+const BYTES_PER_FLOAT = 8
+const WEIGHT_VECTOR_SIZE = FEATURES.length + 1 // + bias term
+
+function pct(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—'
+  return `${(value * 100).toFixed(1)}%`
 }
 
-interface GlobalModel {
-  modelId: string
-  version: string
-  globalAccuracy: number
-  aggregatedWeights: number
-  participatingNodes: number
-  lastUpdate: string
-  convergenceStatus: 'converged' | 'converging' | 'diverged'
+function generateSyntheticTrainingBatch(sampleCount: number) {
+  // Clearly-separable synthetic data so the real logistic regression fit
+  // converges to a high, meaningful accuracy -- this is demo data standing
+  // in for what would otherwise be a well's own historical sensor readings,
+  // which is exactly the raw data federated learning is meant to keep local.
+  const samples: Record<string, number>[] = []
+  const labels: number[] = []
+  for (let i = 0; i < sampleCount; i++) {
+    const isAnomalous = i % 2 === 0
+    samples.push({
+      pressure: (isAnomalous ? 550 : 300) + (Math.random() - 0.5) * 40,
+      temperature: (isAnomalous ? 95 : 80) + (Math.random() - 0.5) * 5,
+      flow_rate: (isAnomalous ? 650 : 400) + (Math.random() - 0.5) * 40,
+      vibration: (isAnomalous ? 0.8 : 0.15) + (Math.random() - 0.5) * 0.1,
+    })
+    labels.push(isAnomalous ? 1 : 0)
+  }
+  return { samples, labels }
 }
 
 export default function FederatedLearning() {
-  const [selectedNode, setSelectedNode] = useState<string>('NODE-001')
+  const queryClient = useQueryClient()
+  const [nodeIdInput, setNodeIdInput] = useState('NODE-001')
+  const [wellNameInput, setWellNameInput] = useState('PROD-001')
+  const [locationInput, setLocationInput] = useState('Field A')
+  const [aggregateError, setAggregateError] = useState<string | null>(null)
 
-  // Mock data for edge nodes
-  const { data: edgeNodes = [] } = useQuery({
+  const nodesQuery = useQuery({
     queryKey: ['federated-nodes'],
-    queryFn: async () => {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      return [
-        {
-          nodeId: 'NODE-001',
-          location: 'Field A',
-          wellName: 'PROD-001',
-          modelVersion: 'LSTM-FL-v2.3',
-          localAccuracy: 92.5,
-          dataSize: 1250,
-          trainingStatus: 'training' as const,
-          lastSync: '2 minutes ago',
-          bandwidthSaved: 1245
-        },
-        {
-          nodeId: 'NODE-002',
-          location: 'Field B',
-          wellName: 'PROD-002',
-          modelVersion: 'LSTM-FL-v2.3',
-          localAccuracy: 91.8,
-          dataSize: 980,
-          trainingStatus: 'syncing' as const,
-          lastSync: '5 minutes ago',
-          bandwidthSaved: 975
-        },
-        {
-          nodeId: 'NODE-003',
-          location: 'Field C',
-          wellName: 'DEV-001',
-          modelVersion: 'LSTM-FL-v2.3',
-          localAccuracy: 93.2,
-          dataSize: 1560,
-          trainingStatus: 'training' as const,
-          lastSync: '1 minute ago',
-          bandwidthSaved: 1555
-        },
-        {
-          nodeId: 'NODE-004',
-          location: 'Field D',
-          wellName: 'OBS-001',
-          modelVersion: 'LSTM-FL-v2.3',
-          localAccuracy: 90.5,
-          dataSize: 890,
-          trainingStatus: 'idle' as const,
-          lastSync: '10 minutes ago',
-          bandwidthSaved: 885
-        }
-      ] as EdgeNode[]
-    },
-    refetchInterval: 5000
+    queryFn: () => federatedAPI.getNodes(),
+    refetchInterval: 5000,
   })
 
-  // Mock data for global model
-  const { data: globalModel } = useQuery({
-    queryKey: ['global-model'],
-    queryFn: async () => {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      return {
-        modelId: 'GLOBAL-LSTM-001',
-        version: 'v2.3',
-        globalAccuracy: 93.1,
-        aggregatedWeights: 156,
-        participatingNodes: 4,
-        lastUpdate: '3 minutes ago',
-        convergenceStatus: 'converging' as const
-      } as GlobalModel
-    },
-    refetchInterval: 5000
+  const globalModelQuery = useQuery({
+    queryKey: ['federated-global-model'],
+    queryFn: () => federatedAPI.getGlobalModel(),
+    refetchInterval: 5000,
   })
 
-  // Mock training history
-  const trainingHistory = Array.from({ length: 20 }, (_, i) => ({
-    epoch: i + 1,
-    globalAccuracy: 85 + (i * 0.4) + Math.random() * 0.5,
-    avgLocalAccuracy: 84 + (i * 0.4) + Math.random() * 0.5
-  }))
+  const trainMutation = useMutation({
+    mutationFn: () => {
+      const { samples, labels } = generateSyntheticTrainingBatch(60)
+      return federatedAPI.trainAndSubmit(nodeIdInput, {
+        well_name: wellNameInput,
+        location: locationInput,
+        samples,
+        labels,
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['federated-nodes'] })
+    },
+  })
 
-  // Mock bandwidth savings
+  const aggregateMutation = useMutation({
+    mutationFn: () => federatedAPI.aggregate(2),
+    onSuccess: () => {
+      setAggregateError(null)
+      queryClient.invalidateQueries({ queryKey: ['federated-nodes'] })
+      queryClient.invalidateQueries({ queryKey: ['federated-global-model'] })
+    },
+    onError: (err: any) => setAggregateError(err?.response?.data?.detail || 'Aggregation failed'),
+  })
+
+  const nodes = nodesQuery.data?.nodes || []
+  const globalModel = globalModelQuery.data?.global_model
+  const roundHistory = globalModelQuery.data?.round_history || []
+
+  // Real bandwidth comparison: raw sensor readings each node trained on
+  // (data_size samples x number of features) vs. the fixed-size weight
+  // vector actually transmitted per node -- this is what federated learning
+  // saves, computed from the real registered nodes rather than a hardcoded
+  // number.
+  const totalRawSamples = nodes.reduce((sum: number, n: any) => sum + n.data_size, 0)
+  const rawBytes = totalRawSamples * FEATURES.length * BYTES_PER_FLOAT
+  const transmittedBytes = nodes.length * WEIGHT_VECTOR_SIZE * BYTES_PER_FLOAT
   const bandwidthData = [
-    { approach: 'Centralized', bandwidth: 5000, privacy: 'Low' },
-    { approach: 'Federated', bandwidth: 156, privacy: 'High' }
+    { approach: 'Raw data (if centralized)', bytes: rawBytes },
+    { approach: 'Federated (weights only)', bytes: transmittedBytes },
   ]
-
-  const selectedNodeData = edgeNodes.find(n => n.nodeId === selectedNode)
+  const bandwidthReductionPct = rawBytes > 0 ? (1 - transmittedBytes / rawBytes) * 100 : 0
 
   return (
     <div className="federated-learning-page">
@@ -126,123 +110,140 @@ export default function FederatedLearning() {
       <div className="fl-stats-grid">
         <div className="stat-card">
           <h3>Participating Nodes</h3>
-          <div className="stat-value">{edgeNodes.length}</div>
-          <div className="stat-label">Active: {edgeNodes.filter(n => n.trainingStatus === 'training').length}</div>
+          <div className="stat-value">{nodes.length}</div>
+          <div className="stat-label">Syncing: {nodes.filter((n: any) => n.status === 'syncing').length}</div>
         </div>
         <div className="stat-card">
           <h3>Global Model Accuracy</h3>
-          <div className="stat-value">{globalModel?.globalAccuracy.toFixed(1)}%</div>
-          <div className="stat-label">{globalModel?.convergenceStatus}</div>
+          <div className="stat-value">{pct(globalModel?.global_accuracy)}</div>
+          <div className="stat-label">{globalModel?.convergence_status || 'no rounds yet'}</div>
         </div>
         <div className="stat-card">
           <h3>Bandwidth Saved</h3>
-          <div className="stat-value">
-            {edgeNodes.reduce((sum, n) => sum + n.bandwidthSaved, 0).toFixed(0)} MB
-          </div>
-          <div className="stat-label">vs Centralized Training</div>
+          <div className="stat-value">{bandwidthReductionPct > 0 ? `${bandwidthReductionPct.toFixed(1)}%` : '—'}</div>
+          <div className="stat-label">vs. transmitting raw readings</div>
         </div>
         <div className="stat-card">
           <h3>Data Privacy</h3>
           <div className="stat-value">100%</div>
-          <div className="stat-label">No raw data transmitted</div>
+          <div className="stat-label">Only model weights leave each node</div>
         </div>
       </div>
 
       <div className="fl-content-grid">
         <div className="nodes-section">
           <h2>Edge Nodes</h2>
-          <div className="nodes-list">
-            {edgeNodes.map(node => (
-              <div
-                key={node.nodeId}
-                className={`node-card ${node.trainingStatus} ${selectedNode === node.nodeId ? 'selected' : ''}`}
-                onClick={() => setSelectedNode(node.nodeId)}
-              >
-                <div className="node-header">
-                  <span className="node-id">{node.nodeId}</span>
-                  <span className={`node-status ${node.trainingStatus}`}>{node.trainingStatus}</span>
-                </div>
-                <div className="node-info">
-                  <p><strong>Location:</strong> {node.location}</p>
-                  <p><strong>Well:</strong> {node.wellName}</p>
-                  <p><strong>Model:</strong> {node.modelVersion}</p>
-                  <p><strong>Local Accuracy:</strong> {node.localAccuracy}%</p>
-                  <p><strong>Data Size:</strong> {node.dataSize} MB</p>
-                  <p><strong>Bandwidth Saved:</strong> {node.bandwidthSaved} MB</p>
-                  <p><strong>Last Sync:</strong> {node.lastSync}</p>
-                </div>
-              </div>
-            ))}
+
+          <div className="node-register-form">
+            <div className="form-row">
+              <input placeholder="Node ID" value={nodeIdInput} onChange={(e) => setNodeIdInput(e.target.value)} />
+              <input placeholder="Well name" value={wellNameInput} onChange={(e) => setWellNameInput(e.target.value)} />
+              <input placeholder="Location" value={locationInput} onChange={(e) => setLocationInput(e.target.value)} />
+            </div>
+            <button onClick={() => trainMutation.mutate()} disabled={trainMutation.isPending}>
+              {trainMutation.isPending ? 'Training locally...' : 'Simulate Local Training + Submit'}
+            </button>
+            <p className="muted">
+              Fits a real logistic-regression model on a synthetic demo batch generated in the
+              browser, then submits only the resulting weights (never the samples) to the coordinator.
+            </p>
+            {trainMutation.isError && <p className="error">Training/submit failed.</p>}
           </div>
+
+          {nodes.length === 0 ? (
+            <p className="muted">No edge nodes have submitted an update yet.</p>
+          ) : (
+            <div className="nodes-list">
+              {nodes.map((node: any) => (
+                <div key={node.node_id} className={`node-card ${node.status}`}>
+                  <div className="node-header">
+                    <span className="node-id">{node.node_id}</span>
+                    <span className={`node-status ${node.status}`}>{node.status}</span>
+                  </div>
+                  <div className="node-info">
+                    <p><strong>Location:</strong> {node.location}</p>
+                    <p><strong>Well:</strong> {node.well_name}</p>
+                    <p><strong>Local Accuracy:</strong> {pct(node.local_accuracy)}</p>
+                    <p><strong>Samples Trained On:</strong> {node.data_size}</p>
+                    <p><strong>Last Sync:</strong> {new Date(node.last_sync).toLocaleString()}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="global-model-section">
           <h2>Global Model</h2>
-          {globalModel && (
+          <div className="form-row">
+            <button onClick={() => aggregateMutation.mutate()} disabled={aggregateMutation.isPending || nodes.length < 2}>
+              {aggregateMutation.isPending ? 'Aggregating...' : 'Run FedAvg Aggregation Round'}
+            </button>
+          </div>
+          {nodes.length < 2 && <p className="muted">Need at least 2 nodes to aggregate.</p>}
+          {aggregateError && <p className="error">{aggregateError}</p>}
+
+          {globalModel?.has_global_model ? (
             <div className="global-model-card">
               <div className="model-header">
-                <h3>{globalModel.modelId}</h3>
-                <span className={`convergence-status ${globalModel.convergenceStatus}`}>
-                  {globalModel.convergenceStatus}
+                <h3>Round {globalModel.round}</h3>
+                <span className={`convergence-status ${globalModel.convergence_status}`}>
+                  {globalModel.convergence_status}
                 </span>
               </div>
               <div className="model-metrics">
                 <div className="metric-item">
-                  <span className="metric-label">Version</span>
-                  <span className="metric-value">{globalModel.version}</span>
-                </div>
-                <div className="metric-item">
                   <span className="metric-label">Global Accuracy</span>
-                  <span className="metric-value">{globalModel.globalAccuracy}%</span>
-                </div>
-                <div className="metric-item">
-                  <span className="metric-label">Aggregated Weights</span>
-                  <span className="metric-value">{globalModel.aggregatedWeights}</span>
+                  <span className="metric-value">{pct(globalModel.global_accuracy)}</span>
                 </div>
                 <div className="metric-item">
                   <span className="metric-label">Participating Nodes</span>
-                  <span className="metric-value">{globalModel.participatingNodes}</span>
-                </div>
-                <div className="metric-item">
-                  <span className="metric-label">Last Update</span>
-                  <span className="metric-value">{globalModel.lastUpdate}</span>
+                  <span className="metric-value">{globalModel.participating_nodes}</span>
                 </div>
               </div>
 
-              <div className="training-history">
-                <h3>Training History</h3>
-                <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={trainingHistory}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="epoch" />
-                    <YAxis domain={[80, 95]} />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="globalAccuracy" stroke="#3498db" name="Global Accuracy" />
-                    <Line type="monotone" dataKey="avgLocalAccuracy" stroke="#2ecc71" name="Avg Local Accuracy" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              {roundHistory.length > 0 && (
+                <div className="training-history">
+                  <h3>Aggregation Round History</h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <LineChart data={roundHistory}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="round" />
+                      <YAxis domain={[0, 1]} tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
+                      <Tooltip formatter={(v: number) => `${(v * 100).toFixed(1)}%`} />
+                      <Legend />
+                      <Line type="monotone" dataKey="global_accuracy" stroke="#3498db" name="Global Accuracy" />
+                      <Line type="monotone" dataKey="avg_local_accuracy" stroke="#2ecc71" name="Avg Local Accuracy" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
+          ) : (
+            <p className="muted">No aggregation round has run yet.</p>
           )}
         </div>
       </div>
 
       <div className="comparison-section">
-        <h2>Bandwidth & Privacy Comparison</h2>
+        <h2>Bandwidth &amp; Privacy Comparison</h2>
         <div className="comparison-grid">
           <div className="comparison-chart">
-            <h3>Bandwidth Usage</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={bandwidthData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="approach" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="bandwidth" fill="#8884d8" name="Bandwidth (MB)" />
-              </BarChart>
-            </ResponsiveContainer>
+            <h3>Bandwidth Usage (estimated from registered nodes)</h3>
+            {nodes.length === 0 ? (
+              <p className="muted">Register at least one node to see a comparison.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={bandwidthData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="approach" />
+                  <YAxis tickFormatter={(v) => `${(v / 1024).toFixed(1)} KB`} />
+                  <Tooltip formatter={(v: number) => `${(v / 1024).toFixed(2)} KB`} />
+                  <Legend />
+                  <Bar dataKey="bytes" fill="#8884d8" name="Bytes transmitted" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           <div className="privacy-benefits">
@@ -252,59 +253,34 @@ export default function FederatedLearning() {
                 <span className="benefit-icon">🔒</span>
                 <div>
                   <h4>Data Stays Local</h4>
-                  <p>Raw sensor data never leaves the edge device</p>
+                  <p>Raw sensor data never leaves the edge device -- only the fitted model's weights are sent.</p>
                 </div>
               </div>
               <div className="benefit-item">
                 <span className="benefit-icon">📊</span>
                 <div>
                   <h4>Only Weights Transmitted</h4>
-                  <p>Only model weights (156 KB) sent to central server</p>
+                  <p>Each node sends a fixed {WEIGHT_VECTOR_SIZE}-value weight vector ({WEIGHT_VECTOR_SIZE * BYTES_PER_FLOAT} bytes), regardless of how much local data it trained on.</p>
                 </div>
               </div>
               <div className="benefit-item">
                 <span className="benefit-icon">⚡</span>
                 <div>
                   <h4>Reduced Bandwidth</h4>
-                  <p>97% reduction in bandwidth usage vs centralized training</p>
+                  <p>{bandwidthReductionPct > 0 ? `${bandwidthReductionPct.toFixed(1)}% reduction` : 'Reduction'} vs transmitting raw readings, and the gap grows with every additional sample trained on locally.</p>
                 </div>
               </div>
               <div className="benefit-item">
                 <span className="benefit-icon">🛡️</span>
                 <div>
-                  <h4>Enhanced Security</h4>
-                  <p>No sensitive operational data exposed during training</p>
+                  <h4>Weighted Aggregation</h4>
+                  <p>The global model is a data-size-weighted average (FedAvg) of every node's local weights -- nodes with more data have proportionally more influence.</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      {selectedNodeData && (
-        <div className="node-details-section">
-          <h2>Node Details: {selectedNodeData.nodeId}</h2>
-          <div className="node-details-grid">
-            <div className="detail-card">
-              <h3>Training Progress</h3>
-              <div className="progress-info">
-                <p>Local Accuracy: <strong>{selectedNodeData.localAccuracy}%</strong></p>
-                <p>Data Processed: <strong>{selectedNodeData.dataSize} MB</strong></p>
-                <p>Status: <strong>{selectedNodeData.trainingStatus}</strong></p>
-              </div>
-            </div>
-            <div className="detail-card">
-              <h3>Bandwidth Savings</h3>
-              <div className="savings-info">
-                <p>Saved: <strong>{selectedNodeData.bandwidthSaved} MB</strong></p>
-                <p>Reduction: <strong>97%</strong></p>
-                <p>Last Sync: <strong>{selectedNodeData.lastSync}</strong></p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
-

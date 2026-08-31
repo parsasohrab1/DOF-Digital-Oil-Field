@@ -1,19 +1,34 @@
 """
 Tests for authentication service
 """
-import pytest
+
+import importlib.util
 import sys
 import os
+from pathlib import Path
+
+import pytest
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "auth-service"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from main import app
+# Loaded via importlib with a unique module name: several test files in this
+# suite use a service's own directory + `from main import ...`, which all
+# collide on the same `sys.modules['main']` entry when pytest collects them
+# together (whichever service's test file collects first "wins" and every
+# other file gets that service's main.py instead of its own).
+MODULE_PATH = Path(__file__).resolve().parents[1] / "auth-service" / "main.py"
+spec = importlib.util.spec_from_file_location("auth_service_main", MODULE_PATH)
+auth_service_main = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(auth_service_main)
+
+app = auth_service_main.app
+rate_limit_dependency = auth_service_main.rate_limit_dependency
+
 from shared.database import get_db
 from shared.security import get_password_hash, verify_password
 from shared.token_store import refresh_token_store
-from rate_limiter import rate_limit_dependency
 
 
 def override_get_db(test_db):

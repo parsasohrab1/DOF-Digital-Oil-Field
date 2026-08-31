@@ -3,6 +3,7 @@ Offline Buffer Manager for Data Ingestion Resilience
 Handles data buffering when network connection is unavailable
 Supports both SQLite (legacy) and DuckDB (time-series optimized) storage
 """
+
 import json
 import logging
 import os
@@ -76,8 +77,7 @@ class OfflineBufferManager:
         """Initialize SQLite database for buffering"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS buffered_records (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     record_id TEXT UNIQUE NOT NULL,
@@ -88,8 +88,7 @@ class OfflineBufferManager:
                     last_retry REAL,
                     created_at REAL NOT NULL
                 )
-            """
-            )
+            """)
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_timestamp ON buffered_records (timestamp)"
             )
@@ -99,14 +98,12 @@ class OfflineBufferManager:
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_retry_count ON buffered_records (retry_count)"
             )
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS buffer_metadata (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 )
-            """
-            )
+            """)
             conn.commit()
 
     @contextmanager
@@ -421,36 +418,30 @@ class OfflineBufferManager:
                     total_sqlite = cursor.fetchone()["count"]
 
                     # By source
-                    cursor.execute(
-                        """
+                    cursor.execute("""
                         SELECT source, COUNT(*) as count
                         FROM buffered_records
                         GROUP BY source
-                    """
-                    )
+                    """)
                     by_source = {
                         row["source"]: row["count"] for row in cursor.fetchall()
                     }
 
                     # By retry count
-                    cursor.execute(
-                        """
+                    cursor.execute("""
                         SELECT retry_count, COUNT(*) as count
                         FROM buffered_records
                         GROUP BY retry_count
-                    """
-                    )
+                    """)
                     by_retry = {
                         row["retry_count"]: row["count"] for row in cursor.fetchall()
                     }
 
                     # Oldest record
-                    cursor.execute(
-                        """
+                    cursor.execute("""
                         SELECT MIN(created_at) as oldest
                         FROM buffered_records
-                    """
-                    )
+                    """)
                     oldest_row = cursor.fetchone()
                     oldest = (
                         oldest_row["oldest"]
@@ -465,17 +456,17 @@ class OfflineBufferManager:
                         "total_records": total_sqlite,
                         "by_source": by_source,
                         "by_retry_count": by_retry,
-                        "oldest_record_age_seconds": time.time() - oldest
-                        if oldest
-                        else None,
+                        "oldest_record_age_seconds": (
+                            time.time() - oldest if oldest else None
+                        ),
                         "buffer_size_mb": round(db_size, 2),
                         "max_buffer_size": self.max_buffer_size,
                         "max_buffer_size_mb": self.max_buffer_size_mb,
-                        "buffer_usage_percent": round(
-                            (total_sqlite / self.max_buffer_size) * 100, 2
-                        )
-                        if self.max_buffer_size > 0
-                        else 0,
+                        "buffer_usage_percent": (
+                            round((total_sqlite / self.max_buffer_size) * 100, 2)
+                            if self.max_buffer_size > 0
+                            else 0
+                        ),
                         "duckdb_enabled": self.use_duckdb,
                     }
 

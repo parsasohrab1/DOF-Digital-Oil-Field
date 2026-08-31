@@ -89,7 +89,8 @@ services:
   # API Gateway
   api-gateway:
     build:
-      context: ../../backend/api-gateway
+      context: ../../backend
+      dockerfile: api-gateway/Dockerfile
     ports:
       - "8000:8000"
     depends_on:
@@ -102,7 +103,8 @@ services:
   # Auth Service
   auth-service:
     build:
-      context: ../../backend/auth-service
+      context: ../../backend
+      dockerfile: auth-service/Dockerfile
     ports:
       - "8001:8001"
     depends_on:
@@ -113,7 +115,8 @@ services:
   # Data Ingestion Service
   data-ingestion-service:
     build:
-      context: ../../backend/data-ingestion-service
+      context: ../../backend
+      dockerfile: data-ingestion-service/Dockerfile
     ports:
       - "8002:8002"
     depends_on:
@@ -124,7 +127,8 @@ services:
   # ML Inference Service
   ml-inference-service:
     build:
-      context: ../../backend/ml-inference-service
+      context: ../../backend
+      dockerfile: ml-inference-service/Dockerfile
     ports:
       - "8003:8003"
     depends_on:
@@ -135,7 +139,8 @@ services:
   # Alert Service
   alert-service:
     build:
-      context: ../../backend/alert-service
+      context: ../../backend
+      dockerfile: alert-service/Dockerfile
     ports:
       - "8004:8004"
     depends_on:
@@ -146,7 +151,8 @@ services:
   # Reporting Service
   reporting-service:
     build:
-      context: ../../backend/reporting-service
+      context: ../../backend
+      dockerfile: reporting-service/Dockerfile
     ports:
       - "8005:8005"
     depends_on:
@@ -158,7 +164,8 @@ services:
   # Command & Control Service
   command-control-service:
     build:
-      context: ../../backend/command-control-service
+      context: ../../backend
+      dockerfile: command-control-service/Dockerfile
     ports:
       - "8006:8006"
     depends_on:
@@ -170,7 +177,8 @@ services:
   # Tag Catalog Service
   tag-catalog-service:
     build:
-      context: ../../backend/tag-catalog-service
+      context: ../../backend
+      dockerfile: tag-catalog-service/Dockerfile
     ports:
       - "8007:8007"
     depends_on:
@@ -181,7 +189,8 @@ services:
   # Digital Twin Service
   digital-twin-service:
     build:
-      context: ../../backend/digital-twin-service
+      context: ../../backend
+      dockerfile: digital-twin-service/Dockerfile
     ports:
       - "8008:8008"
     depends_on:

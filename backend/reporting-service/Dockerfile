@@ -2,12 +2,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY shared/requirements.txt ./shared-requirements.txt
-COPY reporting-service/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r shared-requirements.txt -r requirements.txt
+# Build context is backend/ so both the service code and the shared/
+# package it imports (via `from shared.x import y`) are available.
+COPY reporting-service/requirements.txt ./reporting-service/requirements.txt
+RUN pip install --no-cache-dir -r reporting-service/requirements.txt
 
-COPY shared ./shared
-COPY reporting-service/*.py .
+COPY shared/ ./shared/
+COPY reporting-service/ ./reporting-service/
+
+WORKDIR /app/reporting-service
 
 EXPOSE 8005
 

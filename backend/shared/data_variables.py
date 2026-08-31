@@ -2,6 +2,7 @@
 Data Variables Configuration
 65+ parameters with different sampling rates for oil & gas monitoring
 """
+
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 from enum import Enum

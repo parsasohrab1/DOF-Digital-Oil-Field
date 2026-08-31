@@ -1,6 +1,7 @@
 """
 Tests for alert service
 """
+
 import pytest
 import sys
 import os
@@ -138,6 +139,98 @@ def test_alert_rca_endpoint(client):
     assert rca_data["alert_id"] == alert_id
     assert "rca" in rca_data
     assert "suspected_root_cause" in rca_data["rca"]
+
+
+def test_cross_well_correlation_flags_systemic_signal(client):
+    """Three+ wells firing the same rule at once should get a shared
+    facility_correlation_id, distinct from each well's own correlation_id."""
+    now = datetime.utcnow().isoformat()
+    wells = ["WELL-X-001", "WELL-X-002", "WELL-X-003"]
+    for i, well in enumerate(wells):
+        response = client.post(
+            "/alerts",
+            json={
+                "alert_id": f"TEST-XWELL-{i:03d}",
+                "timestamp": now,
+                "severity": "critical",
+                "status": "open",
+                "well_name": well,
+                "sensor_id": f"{well}-comm-link",
+                "message": "Communication loss",
+                "rule_name": "comm_loss",
+            },
+        )
+        assert response.status_code == 201
+
+    facility_response = client.get("/alerts/correlations/facility")
+    assert facility_response.status_code == 200
+    data = facility_response.json()
+    assert data["count"] >= 1
+    group = data["groups"][0]
+    assert group["distinct_wells"] >= 3
+    assert set(wells).issubset(set(group["wells"]))
+
+
+def test_single_well_alert_has_no_facility_correlation(client):
+    """A rule firing on only one well must not be flagged as systemic."""
+    response = client.post(
+        "/alerts",
+        json={
+            "alert_id": "TEST-SINGLEWELL-001",
+            "timestamp": datetime.utcnow().isoformat(),
+            "severity": "warning",
+            "status": "open",
+            "well_name": "WELL-Y-001",
+            "sensor_id": "WELL-Y-001-flow",
+            "message": "Flow anomaly",
+            "rule_name": "flow_anomaly_unique_rule",
+        },
+    )
+    assert response.status_code == 201
+
+    facility_response = client.get("/alerts/correlations/facility")
+    assert facility_response.status_code == 200
+    facility_ids = {
+        g["facility_correlation_id"] for g in facility_response.json()["groups"]
+    }
+    matching = [
+        fid for fid in facility_ids if fid and "flow_anomaly_unique_rule" in fid
+    ]
+    assert matching == []
+
+
+def test_rca_reports_systemic_root_cause_across_wells(client):
+    """RCA on a cross-well incident should point to a systemic cause,
+    not a well-local one."""
+    now = datetime.utcnow().isoformat()
+    wells = ["WELL-Z-001", "WELL-Z-002", "WELL-Z-003", "WELL-Z-004"]
+    last_alert_id = None
+    for i, well in enumerate(wells):
+        alert_id = f"TEST-RCA-XWELL-{i:03d}"
+        last_alert_id = alert_id
+        response = client.post(
+            "/alerts",
+            json={
+                "alert_id": alert_id,
+                "timestamp": now,
+                "severity": "critical",
+                "status": "open",
+                "well_name": well,
+                "sensor_id": f"{well}-scada-link",
+                "message": "SCADA link down",
+                "rule_name": "scada_link_down",
+            },
+        )
+        assert response.status_code == 201
+
+    rca_response = client.post(
+        f"/alerts/{last_alert_id}/rca", json={"lookback_minutes": 60}
+    )
+    assert rca_response.status_code == 200
+    rca = rca_response.json()["rca"]
+    assert rca["scope"] == "facility"
+    assert rca["suspected_root_cause"] == "systemic:scada_link_down"
+    assert rca["distinct_wells"] >= 4
 
 
 def test_create_alert_rule(client):

@@ -1,16 +1,28 @@
+import importlib.util
 import os
 import sys
+from pathlib import Path
 
 import pytest
 import pyotp
 from fastapi.testclient import TestClient
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "remote-operations-service")
-)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from main import app, require_operator, require_command_admin  # type: ignore
+MODULE_PATH = (
+    Path(__file__).resolve().parents[1] / "remote-operations-service" / "main.py"
+)
+spec = importlib.util.spec_from_file_location(
+    "remote_operations_service_main", MODULE_PATH
+)
+remote_operations_service_main = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(remote_operations_service_main)
+
+app = remote_operations_service_main.app
+require_operator = remote_operations_service_main.require_operator
+require_command_admin = remote_operations_service_main.require_command_admin
+
 from shared.database import get_db
 from shared.security import create_access_token
 from shared.secure_command_workflow import secure_command_workflow

@@ -2,6 +2,7 @@
 Connectivity Manager for 5G and Satellite connections
 Manages multiple connectivity options for remote oil field locations
 """
+
 import logging
 import asyncio
 import socket
@@ -66,9 +67,11 @@ class ConnectivityManager:
             "latency": None,
             "bandwidth": None,
             "cost_per_mb": config.get("cost_per_mb", 0),
-            "priority": self.connection_priority.index(connection_type)
-            if connection_type in self.connection_priority
-            else 999,
+            "priority": (
+                self.connection_priority.index(connection_type)
+                if connection_type in self.connection_priority
+                else 999
+            ),
         }
         logger.info(f"Registered connection: {connection_id} ({connection_type.value})")
 

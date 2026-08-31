@@ -1,14 +1,19 @@
+import importlib.util
 import os
 import sys
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "digital-twin-service")
-)
+MODULE_PATH = Path(__file__).resolve().parents[1] / "digital-twin-service" / "main.py"
+spec = importlib.util.spec_from_file_location("digital_twin_service_main", MODULE_PATH)
+digital_twin_service_main = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(digital_twin_service_main)
 
-from main import app, simulations_db  # type: ignore
+app = digital_twin_service_main.app
+simulations_db = digital_twin_service_main.simulations_db
 
 
 @pytest.fixture(autouse=True)

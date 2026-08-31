@@ -2,6 +2,7 @@
 Remaining Useful Life (RUL) Prediction Model
 Specialized ML models for oil field equipment RUL prediction
 """
+
 import logging
 import numpy as np
 from typing import Any, Dict, List, Optional, Tuple

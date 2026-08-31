@@ -2,6 +2,7 @@
 Tag Catalog Service
 Central repository for well/tag metadata, units, and valid ranges
 """
+
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -11,7 +12,7 @@ import uvicorn
 import sys
 import os
 
-# Add backend directory to path so `shared` can be imported as a package
+# Add shared module to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.database import get_db

@@ -2,11 +2,13 @@
 Data Ingestion Service
 Manages connectors, schema validation, and DLQ handling
 """
+
 import asyncio
 import json
 import os
 import sys
 import time
+import httpx
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -26,7 +28,7 @@ from prometheus_client import Counter, Histogram
 from pydantic import BaseModel, Field
 import uvicorn
 
-# Add backend directory to path so `shared` can be imported as a package
+# Add shared module to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.database import get_timescale_db, get_db
@@ -294,7 +296,6 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
-    global retry_task, mqtt_client
     if retry_task:
         retry_task.cancel()
         try:
@@ -392,9 +393,12 @@ async def ingest_data(
                 sensor_id=record.sensor_id,
                 value=record.value,
                 timestamp=record.timestamp,
-                expected_range=(tag.valid_range_min, tag.valid_range_max)
-                if tag.valid_range_min is not None and tag.valid_range_max is not None
-                else None,
+                expected_range=(
+                    (tag.valid_range_min, tag.valid_range_max)
+                    if tag.valid_range_min is not None
+                    and tag.valid_range_max is not None
+                    else None
+                ),
             )
 
             # Use corrected value if drift detected
@@ -410,9 +414,11 @@ async def ingest_data(
                 timestamp=record.timestamp,
                 tag_id=record.sensor_id,
                 value=final_value,
-                data_quality=health_status.data_quality
-                if health_status.correction_applied
-                else record.data_quality,
+                data_quality=(
+                    health_status.data_quality
+                    if health_status.correction_applied
+                    else record.data_quality
+                ),
             )
             tsdb.add(db_record)
             validated_records.append(record.dict())
@@ -420,6 +426,16 @@ async def ingest_data(
             payload_bytes += len(json.dumps(record.dict(), default=str).encode("utf-8"))
 
         tsdb.commit()
+
+        # Push straight to the Gateway's realtime WebSocket stream so
+        # dashboards see new readings within one HTTP hop instead of waiting
+        # for the Gateway's next poll cycle (previously up to 1s).
+        if validated_records:
+            background_tasks.add_task(
+                push_to_gateway_realtime,
+                validated_records,
+                request.source,
+            )
 
         # Publish to Kafka or buffer if offline
         if validated_records:
@@ -455,6 +471,18 @@ async def ingest_data(
             records_ingested=len(validated_records),
             source=request.source,
         )
+    except HTTPException:
+        # Preserve the specific status code/detail from the validation checks
+        # above (422 unknown sensor, mismatch, out-of-range, ...) instead of
+        # falling through to the generic 400 handler below.
+        duration = time.perf_counter() - start_time
+        INGEST_LATENCY.labels(source=request.source).observe(duration)
+        INGEST_RECORDS_PER_REQUEST.labels(source=request.source).observe(
+            len(validated_records)
+        )
+        if payload_bytes:
+            INGEST_PAYLOAD_BYTES.labels(source=request.source).inc(payload_bytes)
+        raise
     except Exception as e:
         duration = time.perf_counter() - start_time
         INGEST_LATENCY.labels(source=request.source).observe(duration)
@@ -489,6 +517,32 @@ def buffer_records(records: List[dict], source: str):
             BUFFERED_RECORDS.labels(source=source).inc()
 
     logger.info(f"Buffered {buffered_count}/{len(records)} records from {source}")
+
+
+GATEWAY_REALTIME_PUSH_URL = (
+    f"http://{os.getenv('SERVICE_HOST', 'localhost')}:8000/internal/realtime/publish"
+)
+
+
+async def push_to_gateway_realtime(records: List[dict], source: str):
+    """Push freshly-ingested records straight to the Gateway's realtime
+    WebSocket stream, instead of relying on the Gateway polling
+    data-ingestion's REST endpoint once a second. Best-effort: a failure here
+    must never affect the ingest response, since Kafka/the buffer remain the
+    durable path for this data.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            await client.post(
+                GATEWAY_REALTIME_PUSH_URL,
+                headers={"X-Internal-Token": settings.INTERNAL_SERVICE_TOKEN},
+                json={
+                    "type": "sensor_data",
+                    "data": {"sensor_records": records, "source": source},
+                },
+            )
+    except Exception as e:
+        logger.debug(f"Realtime push to gateway failed (non-fatal): {e}")
 
 
 def publish_to_kafka(records: List[dict], source: str):

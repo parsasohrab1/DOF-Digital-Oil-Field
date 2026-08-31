@@ -1,6 +1,7 @@
 """
 Security alert helpers for tracking suspicious activity.
 """
+
 from datetime import datetime, timedelta
 from typing import Dict, Tuple
 

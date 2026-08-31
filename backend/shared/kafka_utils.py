@@ -1,6 +1,7 @@
 """
 Kafka producer and consumer utilities
 """
+
 from typing import Dict, Any, Optional, Callable
 from confluent_kafka import Producer, Consumer, KafkaError, KafkaException
 from confluent_kafka.schema_registry import SchemaRegistryClient
@@ -33,9 +34,11 @@ class KafkaProducerWrapper:
             conf = {
                 "bootstrap.servers": settings.KAFKA_BOOTSTRAP_SERVERS,
                 "client.id": f"{settings.APP_NAME}-producer-lowlatency",
-                "acks": settings.KAFKA_PRODUCER_ACKS
-                if settings.KAFKA_PRODUCER_ACKS in ["0", "1", "all"]
-                else "1",
+                "acks": (
+                    settings.KAFKA_PRODUCER_ACKS
+                    if settings.KAFKA_PRODUCER_ACKS in ["0", "1", "all"]
+                    else "1"
+                ),
                 "retries": 1,  # Reduced retries for lower latency
                 "max.in.flight.requests.per.connection": 5,  # Higher for throughput
                 "linger.ms": settings.KAFKA_PRODUCER_LINGER_MS,  # 0 for immediate send
@@ -49,9 +52,11 @@ class KafkaProducerWrapper:
             conf = {
                 "bootstrap.servers": settings.KAFKA_BOOTSTRAP_SERVERS,
                 "client.id": f"{settings.APP_NAME}-producer",
-                "acks": settings.KAFKA_PRODUCER_ACKS
-                if settings.KAFKA_PRODUCER_ACKS in ["0", "1", "all"]
-                else "all",
+                "acks": (
+                    settings.KAFKA_PRODUCER_ACKS
+                    if settings.KAFKA_PRODUCER_ACKS in ["0", "1", "all"]
+                    else "all"
+                ),
                 "retries": 3,
                 "max.in.flight.requests.per.connection": 1,  # For exactly-once semantics
                 "linger.ms": settings.KAFKA_PRODUCER_LINGER_MS,

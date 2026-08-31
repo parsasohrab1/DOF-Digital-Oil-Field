@@ -6,6 +6,7 @@ Providers:
   - kavenegar: Iranian SMS gateway (https://api.kavenegar.com)
   - twilio: international SMS
 """
+
 from __future__ import annotations
 
 import re
@@ -37,9 +38,7 @@ def normalize_iran_mobile(phone: str) -> str:
         national = digits
 
     if not re.fullmatch(r"9\d{9}", national):
-        raise ValueError(
-            "شماره موبایل نامعتبر است. مثال: 09121234567 یا +989121234567"
-        )
+        raise ValueError("شماره موبایل نامعتبر است. مثال: 09121234567 یا +989121234567")
     return f"+98{national}"
 
 
@@ -173,7 +172,11 @@ async def send_sms(
     result: Dict[str, Any]
 
     if not settings.SMS_ENABLED:
-        result = {"provider": provider, "status": "disabled", "reason": "SMS_ENABLED=false"}
+        result = {
+            "provider": provider,
+            "status": "disabled",
+            "reason": "SMS_ENABLED=false",
+        }
     elif provider == "kavenegar" and status_info["provider_ready"]:
         try:
             result = await _send_kavenegar(e164, message)

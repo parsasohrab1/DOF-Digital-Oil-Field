@@ -1,6 +1,7 @@
 """
 Security utilities: password hashing, JWT tokens, 2FA
 """
+
 from datetime import datetime, timedelta
 from typing import Optional
 import jwt

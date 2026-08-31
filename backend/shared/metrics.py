@@ -1,6 +1,7 @@
 """
 Prometheus metrics helper for FastAPI services.
 """
+
 import time
 from typing import Optional
 

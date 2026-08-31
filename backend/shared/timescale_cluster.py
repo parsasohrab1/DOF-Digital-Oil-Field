@@ -1,6 +1,7 @@
 """
 TimescaleDB Multi-node Cluster Management
 """
+
 import logging
 from typing import List, Dict, Optional, Tuple
 from sqlalchemy import create_engine, text
@@ -67,9 +68,7 @@ class TimescaleClusterManager:
 
             try:
                 # Add data node
-                conn.execute(
-                    text(
-                        f"""
+                conn.execute(text(f"""
                     SELECT add_data_node(
                         '{node_host}',
                         host => '{node_host}',
@@ -78,9 +77,7 @@ class TimescaleClusterManager:
                         user => '{user}',
                         password => '{password}'
                     );
-                """
-                    )
-                )
+                """))
                 conn.commit()
 
                 logger.info(f"Added data node: {node_host}:{node_port}")
@@ -112,13 +109,9 @@ class TimescaleClusterManager:
                 conn = timescale_engine.connect()
 
             try:
-                conn.execute(
-                    text(
-                        f"""
+                conn.execute(text(f"""
                     SELECT delete_data_node('{node_name}', force => true);
-                """
-                    )
-                )
+                """))
                 conn.commit()
 
                 logger.info(f"Removed data node: {node_name}")
@@ -149,13 +142,9 @@ class TimescaleClusterManager:
                 conn = timescale_engine.connect()
 
             try:
-                result = conn.execute(
-                    text(
-                        """
+                result = conn.execute(text("""
                     SELECT * FROM timescaledb_information.data_nodes;
-                """
-                    )
-                )
+                """))
 
                 nodes = []
                 for row in result:
@@ -165,12 +154,16 @@ class TimescaleClusterManager:
                             "host": row.host,
                             "port": row.port,
                             "database": row.database,
-                            "node_created": row.node_created.isoformat()
-                            if row.node_created
-                            else None,
-                            "database_created": row.database_created.isoformat()
-                            if row.database_created
-                            else None,
+                            "node_created": (
+                                row.node_created.isoformat()
+                                if row.node_created
+                                else None
+                            ),
+                            "database_created": (
+                                row.database_created.isoformat()
+                                if row.database_created
+                                else None
+                            ),
                         }
                     )
 
@@ -291,14 +284,10 @@ class TimescaleClusterManager:
                 status["data_nodes"] = data_nodes
 
                 # Get distributed hypertables
-                result = conn.execute(
-                    text(
-                        """
+                result = conn.execute(text("""
                     SELECT * FROM timescaledb_information.hypertables
                     WHERE is_distributed = true;
-                """
-                    )
-                )
+                """))
 
                 hypertables = []
                 for row in result:
@@ -307,9 +296,11 @@ class TimescaleClusterManager:
                             "hypertable_name": row.hypertable_name,
                             "num_dimensions": row.num_dimensions,
                             "num_chunks": row.num_chunks,
-                            "compression_enabled": row.compression_enabled
-                            if hasattr(row, "compression_enabled")
-                            else False,
+                            "compression_enabled": (
+                                row.compression_enabled
+                                if hasattr(row, "compression_enabled")
+                                else False
+                            ),
                         }
                     )
 
@@ -349,13 +340,9 @@ class TimescaleClusterManager:
             try:
                 hypertable_name = validate_hypertable_name(conn, hypertable_name)
                 data_node_name = validate_column_identifier(data_node_name)
-                conn.execute(
-                    text(
-                        f"""
+                conn.execute(text(f"""
                     SELECT attach_data_node('{data_node_name}', '{hypertable_name}');
-                """
-                    )
-                )
+                """))
                 conn.commit()
 
                 logger.info(

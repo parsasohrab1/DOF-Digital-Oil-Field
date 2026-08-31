@@ -5,6 +5,7 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+  workflow_dispatch: {}
 
 env:
   REGISTRY: ghcr.io
@@ -29,32 +30,49 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    
+
     - name: Install dependencies
       run: |
-        cd backend
-        pip install -r shared/requirements.txt
-        pip install -r tests/requirements.txt
+        python -m pip install --upgrade pip
         pip install pytest pytest-cov pytest-asyncio
-    
+        pip install -r requirements.txt
+        pip install -r backend/shared/requirements.txt
+        pip install -r backend/alert-service/requirements.txt
+        pip install -r backend/command-control-service/requirements.txt
+        pip install -r backend/data-ingestion-service/requirements.txt
+        pip install -r backend/tag-catalog-service/requirements.txt
+        pip install -r backend/api-gateway/requirements.txt
+        pip install -r backend/ml-inference-service/requirements.txt
+        pip install -r backend/auth-service/requirements.txt
+        pip install -r backend/digital-twin-service/requirements.txt
+        pip install -r backend/reporting-service/requirements.txt
+        pip install -r backend/remote-operations-service/requirements.txt
+
     - name: Run tests
-      continue-on-error: true
       run: |
         cd backend
-        export PYTHONPATH="${PYTHONPATH}:$(pwd):$(pwd)/shared"
-        pytest tests/ -v --tb=short --cov=. --cov-report=xml --cov-report=term || echo "Tests completed with warnings"
+        pytest --cov-report=xml
       env:
-        DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/test_db
-        PYTHONPATH: ${{ github.workspace }}/backend:${{ github.workspace }}/backend/shared
+        SQLALCHEMY_DATABASE_URL: sqlite:///./ci.db
+        MODEL_STORAGE_PATH: ${{ github.workspace }}/backend/ml-inference-service/models
     
     - name: Upload coverage
       if: always()
@@ -83,22 +101,20 @@ jobs:
         pip install flake8 black mypy
     
     - name: Run black (check only)
-      continue-on-error: true
       run: |
         cd backend
-        black --check . --exclude="/(\.git|\.venv|venv|__pycache__|node_modules)/" || true
-    
+        black --check . --exclude="/(\.git|\.venv|venv|__pycache__|node_modules)/"
+
     - name: Run flake8
-      continue-on-error: true
       run: |
         cd backend
-        flake8 . --max-line-length=120 --extend-ignore=E203,W503,E501,F401,F403,F405 --exclude=venv,__pycache__,.venv || true
+        flake8 . --max-line-length=120 --extend-ignore=E203,W503,E501,F401,F403,F405 --exclude=venv,__pycache__,.venv
 
   build-backend:
     name: Build Backend Images
     needs: [test, lint]
     runs-on: ubuntu-latest
-    if: always() && github.event_name == 'push'
+    if: github.event_name == 'push'
     
     strategy:
       matrix:
@@ -146,7 +162,7 @@ jobs:
     name: Build Frontend
     needs: lint
     runs-on: ubuntu-latest
-    if: always() && github.event_name == 'push'
+    if: github.event_name == 'push'
     
     steps:
     - name: Checkout code
@@ -179,7 +195,7 @@ jobs:
     name: Deploy to Staging
     needs: [build-backend, build-frontend]
     runs-on: ubuntu-latest
-    if: always() && github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/develop'
     
     steps:
     - name: Checkout code

@@ -2,6 +2,7 @@
 Storage Optimization Service
 مدیریت بهینه‌سازی ذخیره‌سازی: Compression, Partitioning, Retention
 """
+
 import os
 import sys
 from datetime import datetime, timedelta
@@ -12,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
 
-# Add backend directory to path so `shared` can be imported as a package
+# Add shared module to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from shared.config import settings
@@ -248,9 +249,9 @@ async def get_partitioning_config(
             dimensions.append(
                 {
                     "type": dim_row.dimension_type,
-                    "time_interval": str(dim_row.time_interval)
-                    if dim_row.time_interval
-                    else None,
+                    "time_interval": (
+                        str(dim_row.time_interval) if dim_row.time_interval else None
+                    ),
                     "integer_interval": dim_row.integer_interval,
                 }
             )
@@ -356,9 +357,9 @@ async def get_storage_stats(
                 "total_hypertables": len(stats),
                 "total_chunks": total_chunks,
                 "compressed_chunks": compressed_chunks,
-                "compression_rate": (compressed_chunks / total_chunks * 100)
-                if total_chunks > 0
-                else 0,
+                "compression_rate": (
+                    (compressed_chunks / total_chunks * 100) if total_chunks > 0 else 0
+                ),
             },
         }
     except Exception as e:

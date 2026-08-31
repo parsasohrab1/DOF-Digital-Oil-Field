@@ -2,12 +2,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY shared/requirements.txt ./shared-requirements.txt
-COPY auth-service/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r shared-requirements.txt -r requirements.txt
+# Build context is backend/ so both the service code and the shared/
+# package it imports (via `from shared.x import y`) are available.
+COPY auth-service/requirements.txt ./auth-service/requirements.txt
+RUN pip install --no-cache-dir -r auth-service/requirements.txt
 
-COPY shared ./shared
-COPY auth-service/*.py .
+COPY shared/ ./shared/
+COPY auth-service/ ./auth-service/
+
+WORKDIR /app/auth-service
 
 EXPOSE 8001
 

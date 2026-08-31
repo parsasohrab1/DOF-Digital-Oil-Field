@@ -4,6 +4,7 @@ import { OrbitControls, PerspectiveCamera, Text, Html, Environment } from '@reac
 import * as THREE from 'three'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { well3DAPI, digitalTwinAPI } from '../api/services'
+import { shouldUseLocalLive } from '../api/offlineMode'
 import {
   FIELD,
   DEHLORAN_WELLS,
@@ -83,6 +84,17 @@ interface Well3DData {
   bop?: BOPData
   casings?: CasingData[]
   wellheadEquipment?: WellheadEquipment
+}
+
+// <Environment preset="..."> fetches an HDR file from a remote CDN, which
+// throws (and blanks the whole Canvas) with no internet connection. The
+// scene already has its own ambient/directional/point lights, so offline we
+// just fall back to a flat background color instead of image-based lighting.
+function SceneBackdrop() {
+  if (shouldUseLocalLive()) {
+    return <color attach="background" args={['#0f172a']} />
+  }
+  return <Environment preset="sunset" />
 }
 
 function valveStatusFa(s: string) {
@@ -690,7 +702,7 @@ function MultipleWellsScene({ wellsData, wells }: { wellsData: Record<string, We
         )
       })}
 
-      <Environment preset="sunset" />
+      <SceneBackdrop />
     </>
   )
 }
@@ -783,7 +795,7 @@ function WellScene({ data, autoRotate = false }: { data: Well3DData; autoRotate?
       </Html>
 
       {/* Environment */}
-      <Environment preset="sunset" />
+      <SceneBackdrop />
     </>
   )
 }

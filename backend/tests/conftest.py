@@ -1,9 +1,21 @@
 """
 PyTest configuration and fixtures
 """
+
 import os
 import pytest
 import sys
+
+# Every service's main.py calls shared.tracing.setup_tracing() at import time,
+# which otherwise starts a real OTLP exporter thread per test module that
+# retries against an unreachable collector (see shared/tracing.py). Must be
+# set before any service module is imported below.
+os.environ.setdefault("OTEL_SDK_DISABLED", "true")
+# Belt-and-suspenders in case anything still builds a real exporter: fall
+# back to console output instead of a network collector.
+os.environ.setdefault("OTEL_TRACING_CONSOLE", "true")
+os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
@@ -11,15 +23,10 @@ from fastapi.testclient import TestClient
 # Add backend root to path for shared package imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-# Avoid OTLP export failures when collector is not running during tests
-os.environ.setdefault("OTEL_TRACING_CONSOLE", "true")
-os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-
 from shared.database import Base
 from shared.models import User
 from shared.security import get_password_hash
 
-# Test database URL
 TEST_DATABASE_URL = "sqlite:///./test.db"
 
 
@@ -30,6 +37,7 @@ def test_engine():
     Base.metadata.create_all(bind=engine)
     yield engine
     Base.metadata.drop_all(bind=engine)
+    engine.dispose()
 
 
 @pytest.fixture(scope="function")

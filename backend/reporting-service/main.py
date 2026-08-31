@@ -2,6 +2,7 @@
 Reporting Service
 Generates periodic and on-demand analytical reports
 """
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -19,10 +20,10 @@ from prometheus_client import Counter, Histogram
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from shared.logging_config import setup_logging
-from shared.metrics import setup_metrics
-from shared.tracing import setup_tracing
-from shared.config import settings
+from shared.logging_config import setup_logging  # type: ignore
+from shared.metrics import setup_metrics  # type: ignore
+from shared.tracing import setup_tracing  # type: ignore
+from shared.config import settings  # type: ignore
 
 logger = setup_logging("reporting-service")
 app = FastAPI(title="OGIM Reporting Service", version="1.0.0")
@@ -351,9 +352,11 @@ async def _execute_step(step: WorkflowStep, context: Dict[str, Any]) -> Dict[str
             return {
                 "status_code": response.status_code,
                 "ok": response.is_success,
-                "body": response.json()
-                if "application/json" in response.headers.get("content-type", "")
-                else response.text,
+                "body": (
+                    response.json()
+                    if "application/json" in response.headers.get("content-type", "")
+                    else response.text
+                ),
             }
 
     if step_type == "generate_report":

@@ -1,16 +1,26 @@
+import importlib.util
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "data-ingestion-service")
-)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from main import app, require_ingest_read, require_ingest_admin, kafka_producer, opcua_client  # type: ignore
+MODULE_PATH = Path(__file__).resolve().parents[1] / "data-ingestion-service" / "main.py"
+spec = importlib.util.spec_from_file_location(
+    "data_ingestion_service_main", MODULE_PATH
+)
+data_ingestion_service_main = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(data_ingestion_service_main)
+
+app = data_ingestion_service_main.app
+require_ingest_read = data_ingestion_service_main.require_ingest_read
+require_ingest_admin = data_ingestion_service_main.require_ingest_admin
+
 from shared.database import get_db, get_timescale_db
 from shared.models import Tag
 
@@ -47,8 +57,8 @@ def client(test_db, test_user, admin_user, monkeypatch):
         "sub": admin_user.username,
         "role": admin_user.role,
     }
-    monkeypatch.setattr("main.kafka_producer", None)
-    monkeypatch.setattr("main.opcua_client", None)
+    monkeypatch.setattr(data_ingestion_service_main, "kafka_producer", None)
+    monkeypatch.setattr(data_ingestion_service_main, "opcua_client", None)
     test_client = TestClient(app)
     yield test_client
     app.dependency_overrides.clear()

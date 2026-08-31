@@ -1,6 +1,7 @@
 """
 Rate limiting middleware
 """
+
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 import time
@@ -14,12 +15,15 @@ class RateLimiter:
 
     def __init__(self, redis_url: str = None):
         self.redis_url = redis_url or settings.REDIS_URL
+        # Always available so the fallback path below works even when the
+        # client constructs fine but Redis becomes unreachable later (only
+        # actual calls fail then, not redis.from_url() itself, which is lazy).
+        self.memory_store: Dict[str, list] = {}
         try:
             self.redis_client = redis.from_url(self.redis_url, decode_responses=True)
         except Exception:
             # Fallback to in-memory if Redis unavailable
             self.redis_client = None
-            self.memory_store: Dict[str, list] = {}
 
     async def check_rate_limit(
         self, key: str, max_requests: int = 100, window_seconds: int = 60

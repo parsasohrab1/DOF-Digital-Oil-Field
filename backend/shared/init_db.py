@@ -2,6 +2,7 @@
 """
 Initialize database schema and create initial data
 """
+
 import os
 import sys
 from sqlalchemy import text
@@ -40,18 +41,14 @@ def create_hypertables():
                 print("Trying regular hypertable as fallback...")
                 # Fallback to regular hypertable
                 chunk_interval = settings.TIMESCALE_CHUNK_TIME_INTERVAL
-                conn.execute(
-                    text(
-                        f"""
+                conn.execute(text(f"""
                     SELECT create_hypertable(
-                        'sensor_data', 
+                        'sensor_data',
                         'timestamp',
                         chunk_time_interval => INTERVAL '{chunk_interval}',
                         if_not_exists => TRUE
                     );
-                """
-                    )
-                )
+                """))
                 conn.commit()
                 print(
                     f"✓ Created regular hypertable for sensor_data (chunk interval: {chunk_interval})"
@@ -60,18 +57,14 @@ def create_hypertables():
             # Create regular hypertable for single-node
             print("Creating hypertable for sensor_data (single-node)...")
             chunk_interval = settings.TIMESCALE_CHUNK_TIME_INTERVAL
-            conn.execute(
-                text(
-                    f"""
+            conn.execute(text(f"""
                 SELECT create_hypertable(
-                    'sensor_data', 
+                    'sensor_data',
                     'timestamp',
                     chunk_time_interval => INTERVAL '{chunk_interval}',
                     if_not_exists => TRUE
                 );
-            """
-                )
-            )
+            """))
             conn.commit()
             print(
                 f"✓ Created hypertable for sensor_data (chunk interval: {chunk_interval})"
@@ -81,25 +74,17 @@ def create_hypertables():
         print("\nOptimizing hypertable for high-volume data ingestion...")
         try:
             # Set chunk interval to 1 day for 10GB/day
-            conn.execute(
-                text(
-                    """
+            conn.execute(text("""
                 SELECT set_chunk_time_interval('sensor_data', INTERVAL '1 day');
-            """
-                )
-            )
+            """))
             conn.commit()
             print("✓ Set chunk interval to 1 day")
 
             # Create additional indexes for better query performance
-            conn.execute(
-                text(
-                    """
-                CREATE INDEX IF NOT EXISTS idx_sensor_data_tag_timestamp 
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_sensor_data_tag_timestamp
                 ON sensor_data (tag_id, timestamp DESC);
-            """
-                )
-            )
+            """))
             conn.commit()
             print("✓ Created optimized indexes")
 

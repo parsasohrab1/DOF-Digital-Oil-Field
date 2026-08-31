@@ -2,12 +2,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY shared/requirements.txt ./shared-requirements.txt
-COPY command-control-service/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r shared-requirements.txt -r requirements.txt
+# Build context is backend/ so both the service code and the shared/
+# package it imports (via `from shared.x import y`) are available.
+COPY command-control-service/requirements.txt ./command-control-service/requirements.txt
+RUN pip install --no-cache-dir -r command-control-service/requirements.txt
 
-COPY shared ./shared
-COPY command-control-service/*.py .
+COPY shared/ ./shared/
+COPY command-control-service/ ./command-control-service/
+
+WORKDIR /app/command-control-service
 
 EXPOSE 8006
 

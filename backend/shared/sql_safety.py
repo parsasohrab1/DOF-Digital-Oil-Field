@@ -5,6 +5,7 @@ Postgres/TimescaleDB table and column identifiers cannot be bound as regular
 query parameters, so any `table_name`/column/interval string that reaches an
 f-string SQL query must first be validated against an allowlist here.
 """
+
 import re
 
 from sqlalchemy import text
