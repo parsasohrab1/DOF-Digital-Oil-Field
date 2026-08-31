@@ -32,10 +32,29 @@
 }
 
 .form-group label {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 5px;
   font-weight: 500;
   color: #555;
+}
+
+.btn-fill-demo {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #007bff;
+  background: #eef5ff;
+  border: 1px solid #b8d4ff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-fill-demo:hover {
+  background: #dcebff;
 }
 
 .form-group input,
