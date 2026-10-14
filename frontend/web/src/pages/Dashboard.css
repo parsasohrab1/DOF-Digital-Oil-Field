@@ -807,3 +807,137 @@
     flex-direction: column;
   }
 }
+
+
+/* Industrial Digital Oil Field theme — dashboard-only visual layer */
+.deh-dashboard {
+  --oil-bg: #07111d;
+  --oil-panel: #101e2c;
+  --oil-panel-2: #142536;
+  --oil-border: rgba(130, 165, 190, .22);
+  --oil-text: #e6f0f7;
+  --oil-muted: #91a8ba;
+  --oil-cyan: #35c4df;
+  --oil-blue: #3d8bff;
+  color: var(--oil-text);
+  color-scheme: dark;
+}
+.deh-dashboard .deh-hero {
+  position: relative;
+  overflow: hidden;
+  align-items: center;
+  padding: 1.5rem 1.75rem;
+  border: 1px solid rgba(73, 165, 201, .35);
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at 82% 0%, rgba(30, 144, 180, .22), transparent 44%),
+    linear-gradient(115deg, #0b1b2b 0%, #10283a 55%, #102031 100%);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .2), inset 0 1px rgba(255,255,255,.04);
+}
+.deh-dashboard .deh-hero::after {
+  content: "DOF  /  LIVE FIELD OPERATIONS";
+  position: absolute;
+  left: 1.6rem;
+  bottom: .75rem;
+  color: rgba(121, 177, 202, .22);
+  font: 700 .68rem ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .18em;
+  pointer-events: none;
+}
+.deh-dashboard .deh-client { color: #50d2e6; letter-spacing: .04em; }
+.deh-dashboard .deh-hero h2 { color: #f2f8fc; font-size: clamp(1.35rem, 2vw, 1.8rem); }
+.deh-dashboard .deh-en { color: #8baec3; }
+.deh-dashboard .deh-meta, .deh-dashboard .deh-stream { color: #a5bbca; }
+.deh-dashboard .deh-stream { padding: .55rem .8rem; border: 1px solid var(--oil-border); border-radius: 8px; background: rgba(3, 12, 21, .35); }
+.deh-dashboard .metrics-grid.deh-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; margin-bottom: 1rem; }
+.deh-dashboard .metric-card,
+.deh-dashboard .deh-panel,
+.deh-dashboard .ap-section {
+  color: var(--oil-text);
+  background: linear-gradient(145deg, rgba(19, 36, 52, .98), rgba(12, 26, 39, .98));
+  border: 1px solid var(--oil-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .13), inset 0 1px rgba(255,255,255,.025);
+}
+.deh-dashboard .metric-card { position: relative; min-height: 112px; padding: 1rem 1.1rem; overflow: hidden; }
+.deh-dashboard .metric-card::before { content: ""; position: absolute; top: 0; right: 0; width: 3px; height: 100%; background: #278db0; opacity: .8; }
+.deh-dashboard .metric-card h3 { color: #9bb2c3; font-size: .78rem; font-weight: 500; }
+.deh-dashboard .metric-value { color: #f1f8fc; font-size: clamp(1.45rem, 2.1vw, 2rem); font-variant-numeric: tabular-nums; }
+.deh-dashboard .metric-value.alert { color: #ff6d78; }
+.deh-dashboard .deh-kpis .metric-card small { color: #8da5b7; }
+.deh-dashboard .pill { background: #1c3345; border: 1px solid rgba(140,170,190,.12); }
+.deh-dashboard .pill.healthy { color: #5de0ac; }
+.deh-dashboard .pill.warning { color: #ffc45e; }
+.deh-dashboard .pill.critical { color: #ff7881; }
+.deh-dashboard .pill.offline { color: #a1b1be; }
+.deh-dashboard .deh-layer { margin-bottom: 1rem; }
+.deh-dashboard .deh-layer-head { padding: .2rem .15rem; }
+.deh-dashboard .deh-layer-head h3 { color: #e3f0f8; font-size: 1.1rem; }
+.deh-dashboard .deh-layer-head p { color: var(--oil-muted); }
+.deh-dashboard .deh-panel { padding: 1rem 1.1rem; }
+.deh-dashboard .deh-panel h4 { color: #e0edf5; }
+.deh-dashboard .deh-map-title { color: #dceaf3; }
+.deh-dashboard .deh-legend { color: #9cb2c2; }
+.deh-dashboard .deh-map {
+  height: 350px;
+  background:
+    radial-gradient(ellipse at 52% 46%, rgba(20, 105, 134, .24), transparent 55%),
+    linear-gradient(rgba(84, 138, 166, .07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(84, 138, 166, .07) 1px, transparent 1px),
+    linear-gradient(145deg, #0b1a28, #102a3a 58%, #091522);
+  background-size: auto, 28px 28px, 28px 28px, auto;
+  border: 1px solid rgba(76, 157, 189, .28);
+  box-shadow: inset 0 0 45px rgba(0,0,0,.22);
+}
+.deh-dashboard .deh-map::before {
+  content: "FIELD GRID  •  DEHLORAN ASSET NETWORK";
+  position: absolute; top: 12px; right: 14px;
+  color: rgba(123, 178, 202, .58); font: 10px ui-monospace, monospace; letter-spacing: .12em;
+}
+.deh-dashboard .deh-well-dot { border: 2px solid rgba(238,248,255,.72); box-shadow: 0 0 0 4px rgba(53,196,223,.09), 0 0 18px currentColor; }
+.deh-dashboard .deh-stat { background: #0b1926; border: 1px solid rgba(130,165,190,.14); }
+.deh-dashboard .deh-stat span, .deh-dashboard .deh-muted { color: #94aabb; }
+.deh-dashboard .deh-stat strong { color: #e7f3fa; }
+.deh-dashboard .deh-sensor-table th { color: #9bb3c4; background: #142536; }
+.deh-dashboard .deh-sensor-table th, .deh-dashboard .deh-sensor-table td { border-bottom-color: rgba(130,165,190,.15); }
+.deh-dashboard .sensor-light-card { background: #0b1926; border-color: rgba(130,165,190,.18); }
+.deh-dashboard .sensor-light-card strong { color: #e4f0f7; }
+.deh-dashboard .sensor-light-card small, .deh-dashboard .sensor-light-card em { color: #92a9b9; }
+.deh-dashboard .sensor-row-red { background: rgba(190, 45, 59, .13); }
+.deh-dashboard .sensor-row-yellow { background: rgba(202, 146, 35, .10); }
+.deh-dashboard .deh-health-row .bar { background: #1b3041; }
+.deh-dashboard .deh-health-row em { color: #9db1c0; }
+.deh-dashboard .deh-action-list li, .deh-dashboard .deh-vfm-card { background: #0b1926; border: 1px solid rgba(130,165,190,.12); }
+.deh-dashboard .deh-action-list p, .deh-dashboard .deh-vfm-card small { color: #9bb0bf; }
+.deh-dashboard .ap-section { padding: 1rem; }
+.deh-dashboard .ap-section.on { border-color: rgba(48, 199, 152, .5); box-shadow: inset 0 0 0 1px rgba(48,199,152,.08), 0 10px 26px rgba(0,0,0,.12); }
+.deh-dashboard .ap-badge { color: #55dfb0; }
+.deh-dashboard .ap-power { background: #0a1723; border-color: var(--oil-border); }
+.deh-dashboard .ap-power-btn { color: #91a7b8; }
+.deh-dashboard .ap-power-btn:hover:not(.active) { color: #f1f7fb; background: rgba(255,255,255,.06); }
+.deh-dashboard .ap-reset { background: #172c3d; border-color: var(--oil-border); color: #dbeaf3; }
+.deh-dashboard .ap-reset:hover { background: #203c50; }
+.deh-dashboard .ap-status-pill { background: #0a1926; border-color: var(--oil-border); color: #a4b8c7; }
+.deh-dashboard .ap-status-pill strong { color: #f1f7fb; }
+.deh-dashboard .ap-status-pill.stable { color: #59dfad; border-color: rgba(61,196,145,.38); }
+.deh-dashboard .ap-status-pill.recovering { color: #67caff; border-color: rgba(61,160,255,.38); }
+.deh-dashboard .ap-status-pill.warn, .deh-dashboard .ap-status-pill.declined { color: #ffc45e; }
+.deh-dashboard .ap-slider-row { border-bottom-color: rgba(130,165,190,.15); }
+.deh-dashboard .ap-slider-label span, .deh-dashboard .ap-log li p { color: #8ea6b8; }
+.deh-dashboard .ap-slider-row input[type='range'] { accent-color: #35c4df; }
+.deh-dashboard .ap-log li { border-bottom-color: rgba(130,165,190,.15); }
+.deh-dashboard .ap-log li span { color: #58d4e8; }
+.deh-dashboard .chart-container { min-height: 280px; }
+.deh-dashboard .recharts-cartesian-grid line { stroke: rgba(135,170,194,.14); }
+.deh-dashboard .recharts-text, .deh-dashboard .recharts-legend-item-text { fill: #91a9ba !important; color: #91a9ba !important; }
+.deh-dashboard .recharts-tooltip-wrapper .recharts-default-tooltip { background: #102233 !important; border: 1px solid #2a526a !important; border-radius: 8px; color: #e5f0f7; }
+.deh-dashboard .loading { color: #91a9ba; }
+@media (max-width: 1100px) {
+  .deh-dashboard .metrics-grid.deh-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .deh-dashboard .metrics-grid.deh-kpis { grid-template-columns: 1fr; }
+  .deh-dashboard .deh-hero { padding: 1.2rem; }
+  .deh-dashboard .deh-hero::after { display: none; }
+  .deh-dashboard .deh-map { height: 290px; }
+}
