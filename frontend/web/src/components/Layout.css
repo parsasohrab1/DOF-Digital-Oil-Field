@@ -96,3 +96,45 @@
   background: #ffffff;
   color: #111111;
 }
+
+
+/* Dark industrial control-room shell */
+.layout {
+  background: #07111d;
+  color: #e6f0f7;
+}
+.navbar {
+  position: relative;
+  gap: .85rem;
+  padding: .9rem 1.5rem .8rem;
+  background:
+    radial-gradient(ellipse at 75% 0%, rgba(36, 118, 154, .17), transparent 40%),
+    linear-gradient(115deg, #0b1927, #0e2030 60%, #0a1724);
+  border-bottom: 1px solid rgba(111, 158, 184, .25);
+  box-shadow: 0 8px 28px rgba(0,0,0,.2);
+}
+.nav-brand h1 { color: #eef7fc; font-size: 1.25rem; letter-spacing: .01em; }
+.nav-brand span { color: #8da8ba; }
+.nav-user { color: #b8cad6; }
+.nav-user button { background: #172b3b; color: #d9e8f0; border-color: rgba(132,168,190,.3); }
+.nav-user button:hover { background: #203b50; }
+.offline-live-badge { background: rgba(26, 133, 105, .18); border-color: rgba(65,211,165,.35); color: #63e2b6; }
+.nav-links { gap: .35rem; }
+.nav-links a { color: #9fb4c3; border: 1px solid transparent; border-radius: 7px; padding: .48rem .75rem; font-size: .86rem; }
+.nav-links a:hover { background: rgba(79, 162, 195, .11); color: #eaf6fc; }
+.nav-links a.active { background: rgba(38, 155, 190, .18); color: #67d8ec; border-color: rgba(58,190,218,.25); }
+.layout > .main-content {
+  padding: clamp(.85rem, 2vw, 1.65rem);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(23, 70, 95, .13), transparent 60%),
+    #07111d;
+  color: #e6f0f7;
+}
+@media (max-width: 700px) {
+  .navbar { padding: .8rem; }
+  .navbar-top { align-items: flex-start; gap: .7rem; }
+  .nav-brand h1 { font-size: 1.05rem; }
+  .nav-links { flex-wrap: nowrap; overflow-x: auto; padding-bottom: .25rem; }
+  .nav-links a { white-space: nowrap; }
+  .layout > .main-content { padding: .7rem; }
+}
