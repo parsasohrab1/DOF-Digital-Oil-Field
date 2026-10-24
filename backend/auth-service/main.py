@@ -16,7 +16,7 @@ import os
 # Add backend root to path so `shared` is importable as a package
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from shared.database import get_db
+from shared.database import ensure_dev_tables, get_db
 from shared.models import User
 from shared.security import (
     verify_password,
@@ -144,6 +144,7 @@ async def get_current_active_admin(
 async def startup_event():
     """Initialize database on startup"""
     logger.info("Starting auth service...")
+    ensure_dev_tables()
     logger.info("Ensure database migrations are applied before accepting traffic.")
 
 

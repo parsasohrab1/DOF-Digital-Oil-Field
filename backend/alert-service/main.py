@@ -16,7 +16,7 @@ import uuid
 # Add shared module to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from shared.database import get_db
+from shared.database import ensure_dev_tables, get_db
 from shared.models import Alert, AlertRule, User
 from shared.config import settings
 from shared.logging_config import setup_logging
@@ -318,6 +318,7 @@ async def startup_event():
     """Initialize database and Kafka on startup"""
     global alert_producer
     logger.info("Starting alert service...")
+    ensure_dev_tables()
     try:
         alert_producer = KafkaProducerWrapper(KAFKA_TOPICS["ALERTS"])
         logger.info("Alert service ready. Ensure database migrations are applied.")

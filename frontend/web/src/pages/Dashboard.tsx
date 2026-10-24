@@ -416,7 +416,7 @@ export default function Dashboard() {
                   <div>
                     <strong>{v.nameFa}</strong>
                     <small>
-                      {reading.display} {v.unit !== '—' ? v.unit : ''}
+                      {reading.display} {v.unit}
                     </small>
                   </div>
                   <em>{statusLabelFa(reading.status)}</em>

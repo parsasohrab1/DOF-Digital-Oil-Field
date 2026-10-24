@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(
     shouldUseLocalLive() ? OFFLINE_USER : GUEST_USER
   )
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false

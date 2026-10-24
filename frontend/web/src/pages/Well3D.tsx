@@ -854,7 +854,7 @@ export default function Well3D() {
     queryFn: async () => {
       try {
         const response = await well3DAPI.getWells()
-        const list = Array.isArray(response) ? response : response?.wells || []
+        const list = Array.isArray(response) ? response : (response as { wells?: typeof dehloranIds } | undefined)?.wells || []
         return list.length >= 8 ? list : dehloranIds
       } catch {
         return dehloranIds

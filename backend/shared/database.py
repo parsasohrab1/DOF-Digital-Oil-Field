@@ -78,7 +78,11 @@ timescale_engine = create_engine(
     pool_timeout=settings.DATABASE_POOL_TIMEOUT_SECONDS,
     echo=False,
     # Optimize for high-volume writes
-    connect_args={"connect_timeout": 10, "application_name": "ogim_timescale_client"},
+    connect_args=(
+        {"connect_timeout": 10, "application_name": "ogim_timescale_client"}
+        if get_timescale_connection_url().startswith("postgresql")
+        else {}
+    ),
 )
 
 # Create session factories
@@ -131,3 +135,24 @@ def init_db():
 def init_timescale_db():
     """Initialize TimescaleDB tables"""
     Base.metadata.create_all(bind=timescale_engine)
+
+
+def ensure_dev_tables() -> None:
+    """Create missing tables on service startup in development only.
+
+    Without this, a fresh dev database (docker-compose.dev.yml has no
+    migration step) makes every DB-backed endpoint fail with HTTP 500
+    ("relation ... does not exist"). Production must keep using Alembic.
+    Disable with AUTO_CREATE_TABLES=false.
+    """
+    if os.getenv("ENVIRONMENT", "development").lower() != "development":
+        return
+    if os.getenv("AUTO_CREATE_TABLES", "true").lower() in ("0", "false", "no"):
+        return
+    from . import models  # noqa: F401  (registers tables on Base)
+
+    for name, bind in (("primary", engine), ("timescale", timescale_engine)):
+        try:
+            Base.metadata.create_all(bind=bind)
+        except Exception as exc:
+            logger.warning("Could not auto-create %s tables: %s", name, exc)

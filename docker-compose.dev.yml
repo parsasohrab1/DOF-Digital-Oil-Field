@@ -68,7 +68,12 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      # Two listeners: containers use kafka:29092, host tools use localhost:9092.
+      # Advertising only localhost made in-container clients fail after bootstrap.
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     healthcheck:
@@ -88,7 +93,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://ogim_user:ogim_password@postgres:5432/ogim
       - REDIS_URL=redis://redis:6379/0
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - LOG_LEVEL=DEBUG
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
@@ -126,7 +131,7 @@ services:
       - "8002:8002"
     environment:
       - TIMESCALE_URL=postgresql://ogim_user:ogim_password@timescaledb:5432/ogim_tsdb
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - LOG_LEVEL=DEBUG
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
@@ -160,7 +165,7 @@ services:
       - "8004:8004"
     environment:
       - DATABASE_URL=postgresql://ogim_user:ogim_password@postgres:5432/ogim
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - LOG_LEVEL=DEBUG
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
@@ -198,7 +203,7 @@ services:
       - "8006:8006"
     environment:
       - DATABASE_URL=postgresql://ogim_user:ogim_password@postgres:5432/ogim
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - LOG_LEVEL=DEBUG
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
@@ -271,7 +276,7 @@ services:
       - "8012:8012"
     environment:
       - DATABASE_URL=postgresql://ogim_user:ogim_password@postgres:5432/ogim
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - LOG_LEVEL=DEBUG
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:

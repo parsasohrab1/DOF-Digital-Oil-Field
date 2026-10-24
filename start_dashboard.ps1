@@ -24,8 +24,8 @@ Write-Host "Starting Backend Services..." -ForegroundColor Yellow
 Write-Host ""
 
 # Start API Gateway
-Write-Host "Starting API Gateway on port 18000..." -ForegroundColor Green
-Start-Process python -ArgumentList "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "18000", "--reload" -WorkingDirectory "backend/api-gateway" -WindowStyle Minimized
+Write-Host "Starting API Gateway on port 8000..." -ForegroundColor Green
+Start-Process python -ArgumentList "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload" -WorkingDirectory "backend/api-gateway" -WindowStyle Minimized
 
 Start-Sleep -Seconds 2
 
@@ -132,8 +132,8 @@ Write-Host "======================================" -ForegroundColor Cyan
 Write-Host "Dashboard URLs:" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host "Frontend: http://localhost:3000" -ForegroundColor Green
-Write-Host "API Gateway: http://localhost:18000" -ForegroundColor Green
-Write-Host "API Docs: http://localhost:18000/docs" -ForegroundColor Green
+Write-Host "API Gateway: http://localhost:8000" -ForegroundColor Green
+Write-Host "API Docs: http://localhost:8000/docs" -ForegroundColor Green
 Write-Host ""
 Write-Host "برای اجرای زنده بدون اینترنت (فقط فرانت‌اند):" -ForegroundColor Yellow
 Write-Host "  .\start_offline_dashboard.ps1" -ForegroundColor White

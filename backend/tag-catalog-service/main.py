@@ -15,7 +15,7 @@ import os
 # Add shared module to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from shared.database import get_db
+from shared.database import ensure_dev_tables, get_db
 from shared.models import Tag
 from shared.config import settings
 from shared.logging_config import setup_logging
@@ -90,6 +90,7 @@ class TagResponse(BaseModel):
 async def startup_event():
     """Initialize database on startup"""
     logger.info("Starting tag catalog service...")
+    ensure_dev_tables()
     try:
         logger.info(
             "Tag catalog service ready. Ensure database migrations are applied."

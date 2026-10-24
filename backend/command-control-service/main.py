@@ -15,7 +15,7 @@ import os
 # Add shared module to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from shared.database import get_db
+from shared.database import ensure_dev_tables, get_db
 from shared.models import Command, User, AuditLog
 from shared.config import settings
 from shared.logging_config import setup_logging
@@ -89,6 +89,7 @@ async def startup_event():
     """Initialize database and Kafka on startup"""
     global command_producer, critical_command_producer
     logger.info("Starting command control service...")
+    ensure_dev_tables()
     try:
         # Standard producer for regular commands
         command_producer = KafkaProducerWrapper(KAFKA_TOPICS["CONTROL_COMMANDS"])
