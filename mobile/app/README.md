@@ -18,9 +18,9 @@ npm start
 
 Set API URL in `app.json` (`expo.extra.apiBaseUrl`), for example:
 
-- Android emulator: `http://10.0.2.2:18000`
-- iOS simulator: `http://localhost:18000`
-- Real device: `http://<your-lan-ip>:18000`
+- Android emulator: `http://10.0.2.2:8000`
+- iOS simulator: `http://localhost:8000`
+- Real device: `http://<your-lan-ip>:8000`
 
 Default credentials: `operator1` / `operator123`
 

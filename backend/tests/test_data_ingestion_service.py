@@ -124,3 +124,40 @@ def test_ingest_invalid_range(client, sample_tag):
 
     response = client.post("/ingest", json=payload)
     assert response.status_code == 422
+
+
+def test_sensor_data_returns_ingested_records(client, sample_tag):
+    ts = datetime.utcnow().isoformat()
+    ingest = client.post(
+        "/ingest",
+        json={
+            "source": "test-source",
+            "records": [
+                {
+                    "timestamp": ts,
+                    "well_name": sample_tag.well_name,
+                    "equipment_type": sample_tag.equipment_type,
+                    "sensor_type": sample_tag.sensor_type,
+                    "value": 77.0,
+                    "unit": sample_tag.unit,
+                    "sensor_id": sample_tag.tag_id,
+                }
+            ],
+        },
+    )
+    assert ingest.status_code == 200
+
+    response = client.get("/sensor-data", params={"well_name": "WELL-1", "limit": 5})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert body["records"][0]["sensor_id"] == sample_tag.tag_id
+    assert body["records"][0]["well_name"] == "WELL-1"
+    assert body["records"][0]["value"] == 77.0
+
+    assert client.get("/sensor-data", params={"well_name": "NOPE"}).json()["count"] == 0
+
+
+def test_health_without_startup_does_not_500(client):
+    """mqtt_client/lorawan_client must exist even when startup failed early."""
+    assert client.get("/health").status_code == 200

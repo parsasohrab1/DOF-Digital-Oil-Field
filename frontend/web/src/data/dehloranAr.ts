@@ -90,12 +90,10 @@ const TECHNICIANS = [
   { name: 'مهندس نوری', role: 'پشتیبان میدان' },
 ]
 
-export function buildDehloranArDevices(tick = Date.now()): ArDevice[] {
-  const live = getDehloranLiveState(tick)
+export function buildDehloranArDevices(_tick = Date.now()): ArDevice[] {
   const types: ArDeviceType[] = ['HoloLens 2', 'RealWear Navigator', 'تبلت واقعیت افزوده میدان']
   return Array.from({ length: 5 }, (_, i) => {
     const well = DEHLORAN_WELLS[i * 3]
-    const lw = live.find((w) => w.id === well.id) || live[i]
     const r = seeded(i + 11)
     const connected = i !== 4 || r > 0.3
     const tech = TECHNICIANS[i]
@@ -115,7 +113,7 @@ export function buildDehloranArDevices(tick = Date.now()): ArDevice[] {
   })
 }
 
-export function buildDehloranArSessions(devices: ArDevice[], tick = Date.now()): ArSession[] {
+export function buildDehloranArSessions(devices: ArDevice[], _tick = Date.now()): ArSession[] {
   return devices
     .filter((d) => d.activeSession)
     .map((d, i) => {

@@ -31,7 +31,7 @@ import uvicorn
 # Add shared module to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from shared.database import get_timescale_db, get_db
+from shared.database import ensure_dev_tables, get_timescale_db, get_db
 from shared.models import SensorData, Tag
 from shared.config import settings
 from shared.logging_config import setup_logging
@@ -74,6 +74,9 @@ opcua_client = None
 offline_buffer = None
 connection_monitor = None
 retry_task = None
+mqtt_client = None
+mqtt_handler = None
+lorawan_client = None
 
 VALIDATION_SUCCESS = Counter(
     "ingest_validation_success_total",
@@ -169,6 +172,7 @@ async def startup_event():
     global kafka_producer, opcua_client, offline_buffer, connection_monitor, retry_task
     global mqtt_client, mqtt_handler, lorawan_client
     logger.info("Starting data ingestion service...")
+    ensure_dev_tables()
     try:
         kafka_producer = KafkaProducerWrapper(KAFKA_TOPICS["RAW_SENSOR_DATA"])
 
@@ -760,6 +764,45 @@ async def stream_from_modbus(
         }
     else:
         raise HTTPException(status_code=500, detail="Failed to stream data")
+
+
+@app.get("/sensor-data")
+async def get_sensor_data(
+    limit: int = 100,
+    well_name: Optional[str] = None,
+    tsdb: Session = Depends(get_timescale_db),
+    meta_db: Session = Depends(get_db),
+    _: Dict[str, Any] = Depends(require_ingest_read),
+):
+    """Latest stored sensor readings (consumed by the dashboard and gateway stream)."""
+    limit = max(1, min(limit, 1000))
+    query = tsdb.query(SensorData).order_by(SensorData.timestamp.desc())
+    if well_name:
+        tag_ids = [
+            t.tag_id
+            for t in meta_db.query(Tag).filter(Tag.well_name == well_name).all()
+        ]
+        query = query.filter(SensorData.tag_id.in_(tag_ids))
+    rows = query.limit(limit).all()
+    tags = {
+        t.tag_id: t
+        for t in meta_db.query(Tag)
+        .filter(Tag.tag_id.in_({r.tag_id for r in rows}))
+        .all()
+    }
+    records = [
+        {
+            "sensor_id": r.tag_id,
+            "well_name": getattr(tags.get(r.tag_id), "well_name", None),
+            "timestamp": r.timestamp.isoformat(),
+            "value": r.value,
+            "data_quality": r.data_quality,
+            "anomaly_flag": r.anomaly_flag,
+            "anomaly_score": r.anomaly_score,
+        }
+        for r in rows
+    ]
+    return {"count": len(records), "records": records}
 
 
 @app.get("/sensor-health/{sensor_id}")

@@ -185,7 +185,7 @@ async def get_well_3d_data(
     Get well data for 3D visualization with depth-based sensor readings
     Returns data organized by depth segments for 3D rendering
     """
-    from models import SensorData, Tag
+    from shared.models import SensorData, Tag
 
     cache_ttl = max(1, settings.CACHE_TTL_SECONDS)
     cached = _well_3d_cache.get(well_name)
@@ -455,7 +455,7 @@ async def get_wells_list(
     _: Dict[str, Any] = Depends(require_authentication),
 ):
     """Get list of all wells"""
-    from models import Tag
+    from shared.models import Tag
 
     wells = db.query(Tag.well_name).distinct().all()
     well_list = (
@@ -475,7 +475,7 @@ async def get_bim_scene(
 ):
     """Get complete 3D BIM scene for a well with real-time states"""
     # Fetch latest sensor data
-    from models import SensorData, Tag
+    from shared.models import SensorData, Tag
 
     # Get all tags for this well
     tags = db.query(Tag).filter(Tag.well_name == well_name).all()
@@ -565,7 +565,7 @@ async def get_model_state(
 ):
     """Get real-time state of a specific 3D model"""
     # Fetch latest state from sensor data
-    from models import SensorData, Tag
+    from shared.models import SensorData, Tag
 
     # Find tag by model_id (assuming model_id contains tag_id)
     tag = db.query(Tag).filter(Tag.tag_id.like(f"%{model_id}%")).first()

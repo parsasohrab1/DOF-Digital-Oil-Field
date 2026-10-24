@@ -51,3 +51,5 @@ Dockerfile text eol=lf
 *.so binary
 *.dylib binary
 
+*.cmd text eol=crlf
+*.bat text eol=crlf
