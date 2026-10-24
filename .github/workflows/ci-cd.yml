@@ -153,7 +153,9 @@ jobs:
     - name: Build and push Docker image
       uses: docker/build-push-action@v4
       with:
-        context: ./backend/${{ matrix.service }}
+        # Dockerfiles expect backend/ as the build context (they COPY shared/ and <service>/).
+        context: ./backend
+        file: ./backend/${{ matrix.service }}/Dockerfile
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
