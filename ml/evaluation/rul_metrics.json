@@ -1,0 +1,48 @@
+{
+  "task": "regression",
+  "dataset": "cmapss_fd001",
+  "split": {
+    "train_engines": 80,
+    "test_engines": 100
+  },
+  "rul_clip": 125,
+  "models": {
+    "random_forest": {
+      "rmse": 18.43555918869423,
+      "mae": 13.43773115624907,
+      "r2": 0.8031873150121767
+    },
+    "gradient_boosting": {
+      "rmse": 18.173744157292973,
+      "mae": 13.056961955304969,
+      "r2": 0.8087377433161482
+    },
+    "xgboost": {
+      "rmse": 18.756717559950918,
+      "mae": 13.800554833412171,
+      "r2": 0.7962704300880432
+    }
+  },
+  "selected_production_model": "gradient_boosting",
+  "feature_names": [
+    "op_set_1",
+    "op_set_2",
+    "s2",
+    "s3",
+    "s4",
+    "s6",
+    "s7",
+    "s8",
+    "s9",
+    "s11",
+    "s12",
+    "s13",
+    "s14",
+    "s15",
+    "s17",
+    "s20",
+    "s21"
+  ],
+  "note": "Test = official FD001 held-out set with true RUL.",
+  "trained_at": "2026-11-16T07:58:27.613347Z"
+}

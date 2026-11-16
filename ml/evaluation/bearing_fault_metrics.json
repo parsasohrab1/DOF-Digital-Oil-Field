@@ -1,0 +1,131 @@
+{
+  "task": "classification",
+  "dataset": "cwru",
+  "split": {
+    "train": 1840,
+    "test": 460
+  },
+  "label_map": {
+    "Normal": 0,
+    "InnerRace": 1,
+    "OuterRace": 2,
+    "Ball": 3
+  },
+  "models": {
+    "random_forest": {
+      "accuracy": 0.9630434782608696,
+      "macro_f1": 0.969110145079747,
+      "weighted_f1": 0.9629321740956964,
+      "roc_auc": 0.9976100459087226,
+      "precision_macro": 0.9690681707465594,
+      "recall_macro": 0.9692028985507246,
+      "confusion_matrix": [
+        [
+          46,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          138,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          130,
+          7
+        ],
+        [
+          0,
+          1,
+          8,
+          129
+        ]
+      ]
+    },
+    "xgboost": {
+      "accuracy": 0.9630434782608696,
+      "macro_f1": 0.9691138192554909,
+      "weighted_f1": 0.9629365831065891,
+      "roc_auc": 0.9968876586551445,
+      "precision_macro": 0.9695622318938742,
+      "recall_macro": 0.9692028985507246,
+      "confusion_matrix": [
+        [
+          46,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          138,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          133,
+          5
+        ],
+        [
+          0,
+          1,
+          11,
+          126
+        ]
+      ]
+    },
+    "lightgbm": {
+      "accuracy": 0.9630434782608696,
+      "macro_f1": 0.9691291018119053,
+      "weighted_f1": 0.962954922174286,
+      "roc_auc": 0.9965568458007021,
+      "precision_macro": 0.9693176095573822,
+      "recall_macro": 0.9692028985507246,
+      "confusion_matrix": [
+        [
+          46,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          138,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          132,
+          6
+        ],
+        [
+          0,
+          1,
+          10,
+          127
+        ]
+      ]
+    }
+  },
+  "selected_production_model": "lightgbm",
+  "feature_names": [
+    "max",
+    "min",
+    "mean",
+    "sd",
+    "rms",
+    "skewness",
+    "kurtosis",
+    "crest",
+    "form"
+  ],
+  "trained_at": "2026-11-16T07:58:30.938337Z"
+}

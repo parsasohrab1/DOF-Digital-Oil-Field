@@ -1,0 +1,91 @@
+{
+  "task": "anomaly_detection",
+  "dataset": "pump_sensor",
+  "split": {
+    "train_normal": 139816,
+    "test": 66096,
+    "test_positives": 76
+  },
+  "models": {
+    "isolation_forest": {
+      "precision": 1.0,
+      "recall": 0.47368421052631576,
+      "f1": 0.6428571428571429,
+      "pr_auc": 0.6355591298458702,
+      "false_alarm_rate": 0.0,
+      "threshold": 0.12491092105678843,
+      "params": {
+        "n_estimators": 200,
+        "contamination": 0.05
+      }
+    },
+    "statistical_z4": {
+      "precision": 0.004670537742994194,
+      "recall": 0.9736842105263158,
+      "f1": 0.0092964824120603,
+      "false_alarm_rate": 0.2388670099969706
+    },
+    "one_class_svm": {
+      "precision": 0.0013866588819150488,
+      "recall": 1.0,
+      "f1": 0.002769477443335034,
+      "pr_auc": 0.029122947987642093,
+      "false_alarm_rate": 0.8290215086337474
+    }
+  },
+  "selected_production_model": "isolation_forest",
+  "feature_names": [
+    "sensor_00",
+    "sensor_01",
+    "sensor_02",
+    "sensor_03",
+    "sensor_04",
+    "sensor_05",
+    "sensor_06",
+    "sensor_07",
+    "sensor_08",
+    "sensor_09",
+    "sensor_10",
+    "sensor_11",
+    "sensor_12",
+    "sensor_13",
+    "sensor_14",
+    "sensor_16",
+    "sensor_17",
+    "sensor_18",
+    "sensor_19",
+    "sensor_20",
+    "sensor_21",
+    "sensor_22",
+    "sensor_23",
+    "sensor_24",
+    "sensor_25",
+    "sensor_26",
+    "sensor_27",
+    "sensor_28",
+    "sensor_29",
+    "sensor_30",
+    "sensor_31",
+    "sensor_32",
+    "sensor_33",
+    "sensor_34",
+    "sensor_35",
+    "sensor_36",
+    "sensor_37",
+    "sensor_38",
+    "sensor_39",
+    "sensor_40",
+    "sensor_41",
+    "sensor_42",
+    "sensor_43",
+    "sensor_44",
+    "sensor_45",
+    "sensor_46",
+    "sensor_47",
+    "sensor_48",
+    "sensor_49",
+    "sensor_51"
+  ],
+  "note": "All metrics computed on a held-out temporal test split. No hardcoded values.",
+  "trained_at": "2026-11-16T07:54:34.040106Z"
+}

@@ -1,0 +1,151 @@
+{
+  "datasets": {
+    "cmapss": {
+      "task": "regression",
+      "target": "RUL",
+      "features": [
+        "op_set_1",
+        "op_set_2",
+        "s2",
+        "s3",
+        "s4",
+        "s6",
+        "s7",
+        "s8",
+        "s9",
+        "s11",
+        "s12",
+        "s13",
+        "s14",
+        "s15",
+        "s17",
+        "s20",
+        "s21"
+      ],
+      "group_col": "unit",
+      "origin": "NASA C-MAPSS turbofan simulation (public benchmark)",
+      "note": "SIMULATED degradation — not field oil/gas measurements; valid for RUL methodology."
+    },
+    "cwru": {
+      "task": "classification",
+      "target": "label",
+      "features": [
+        "max",
+        "min",
+        "mean",
+        "sd",
+        "rms",
+        "skewness",
+        "kurtosis",
+        "crest",
+        "form"
+      ],
+      "label_map": {
+        "Normal": 0,
+        "InnerRace": 1,
+        "OuterRace": 2,
+        "Ball": 3
+      },
+      "origin": "CWRU bearing test-rig laboratory data (public benchmark)",
+      "note": "LABORATORY vibration measurements — real measured accelerations."
+    },
+    "pump": {
+      "task": "anomaly_detection+forecasting",
+      "anomaly_target": "anomaly",
+      "forecast_col": "sensor_00",
+      "features": [
+        "sensor_00",
+        "sensor_01",
+        "sensor_02",
+        "sensor_03",
+        "sensor_04",
+        "sensor_05",
+        "sensor_06",
+        "sensor_07",
+        "sensor_08",
+        "sensor_09",
+        "sensor_10",
+        "sensor_11",
+        "sensor_12",
+        "sensor_13",
+        "sensor_14",
+        "sensor_16",
+        "sensor_17",
+        "sensor_18",
+        "sensor_19",
+        "sensor_20",
+        "sensor_21",
+        "sensor_22",
+        "sensor_23",
+        "sensor_24",
+        "sensor_25",
+        "sensor_26",
+        "sensor_27",
+        "sensor_28",
+        "sensor_29",
+        "sensor_30",
+        "sensor_31",
+        "sensor_32",
+        "sensor_33",
+        "sensor_34",
+        "sensor_35",
+        "sensor_36",
+        "sensor_37",
+        "sensor_38",
+        "sensor_39",
+        "sensor_40",
+        "sensor_41",
+        "sensor_42",
+        "sensor_43",
+        "sensor_44",
+        "sensor_45",
+        "sensor_46",
+        "sensor_47",
+        "sensor_48",
+        "sensor_49",
+        "sensor_51"
+      ],
+      "origin": "Real industrial pump sensor log (public Kaggle dataset)",
+      "note": "FIELD-like time-series with documented breakdown events."
+    },
+    "esp": {
+      "task": "classification",
+      "target": "label_id",
+      "features": [
+        "median(8,13)",
+        "rms(98,102)",
+        "median(98,102)",
+        "peak1x",
+        "peak2x",
+        "a",
+        "b"
+      ],
+      "group_col": "esp_id",
+      "label_map": {
+        "Normal": 0,
+        "Unbalance": 1,
+        "Faulty sensor": 2,
+        "Rubbing": 3,
+        "Misalignment": 4
+      },
+      "origin": "ESP vibration-derived features (ESPset, 11 ESPs)",
+      "note": "Real ESP fault classes from vibration feature extraction."
+    },
+    "sorush": {
+      "task": "regression",
+      "target": "ql_stb_d",
+      "features": [
+        "choke_d64",
+        "pwh_psig",
+        "oil_gravity",
+        "glr_scf_stb"
+      ],
+      "origin": "Sorush oil field production records (Barjouei et al. 2021, J. Pet. Explor. Prod. Technol.) — REAL field data.",
+      "benchmark": {
+        "paper_RMSE_STB_D": 196,
+        "paper_R2": 0.9969,
+        "algorithms_compared": "DL > DT > RF > ANN > SVR"
+      }
+    }
+  }
+}

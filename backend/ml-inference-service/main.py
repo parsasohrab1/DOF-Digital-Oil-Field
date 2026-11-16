@@ -64,7 +64,12 @@ try:
         "Inference latency in seconds",
         ["model_type"],
     )
-except ImportError:  # pragma: no cover - dependency optional at runtime
+except Exception:  # pragma: no cover - dependency optional / re-import safety
+    # ImportError: prometheus_client not installed.
+    # ValueError: the module is re-imported (e.g. by multiple test modules
+    # loading main.py via importlib) and the metric names already exist in the
+    # global registry -- the first registration remains active, this one is a
+    # no-op so the second import does not crash.
     METRICS_ENABLED = False
     INFERENCE_REQUESTS = INFERENCE_ERRORS = INFERENCE_LATENCY = None  # type: ignore
 
@@ -338,6 +343,10 @@ async def infer(request: InferenceRequest):
             deployment_variant=deployment_variant,
             timestamp=datetime.utcnow(),
         )
+    except HTTPException:
+        # Validation errors (e.g. unknown model_type -> 400) must propagate
+        # as-is; the generic handler below would otherwise turn them into 500s.
+        raise
     except RuntimeError as exc:
         logger.warning("Inference unavailable for %s: %s", request.model_type, exc)
         if METRICS_ENABLED:

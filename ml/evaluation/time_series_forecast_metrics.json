@@ -1,0 +1,39 @@
+{
+  "task": "time_series_forecasting",
+  "dataset": "pump_sensor",
+  "channel": "sensor_00",
+  "resample": "10min",
+  "split": {
+    "train_points": 15422,
+    "val_points": 3305,
+    "test_points": 3305
+  },
+  "seq_length": 60,
+  "forecast_horizon": 24,
+  "models": {
+    "lstm": {
+      "mse": 0.007593809626996517,
+      "rmse": 0.0871424674987793,
+      "mae": 0.07065453380346298,
+      "mape": 3.031758777797222,
+      "r2": -1.3596322536468506,
+      "epochs_trained": 15
+    },
+    "ridge_lag_baseline": {
+      "mse": 0.00414544390514493,
+      "rmse": 0.06438512355089188,
+      "mae": 0.019615139812231064,
+      "mape": 0.9640681557357311,
+      "r2": -0.28811800479888916
+    },
+    "naive_persistence": {
+      "rmse": 0.06254302710294724,
+      "mae": 0.01079700980335474,
+      "mape": 0.6061385851353407
+    }
+  },
+  "selected_production_model": "lstm",
+  "derived_confidence": 0.795222245156765,
+  "note": "Confidence derived from validation MAE, not hardcoded. R\u00b2 is negative because the test window is near-constant (low target variance); MAPE/MAE are the meaningful metrics here. The LSTM is shipped as the Keras-compatible artifact for the /forecast service contract; Ridge and naive baselines are reported for comparison.",
+  "trained_at": "2026-11-16T08:06:23.365701Z"
+}

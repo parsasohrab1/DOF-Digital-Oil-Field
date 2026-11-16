@@ -1,0 +1,216 @@
+{
+  "task": "classification",
+  "dataset": "esp_features",
+  "split": {
+    "train": 4825,
+    "test": 1207,
+    "test_class_dist": [
+      961,
+      115,
+      59,
+      58,
+      14
+    ]
+  },
+  "label_map": {
+    "Normal": 0,
+    "Unbalance": 1,
+    "Faulty sensor": 2,
+    "Rubbing": 3,
+    "Misalignment": 4
+  },
+  "models": {
+    "random_forest": {
+      "accuracy": 0.9461474730737366,
+      "macro_f1": 0.8678361137023011,
+      "weighted_f1": 0.9485047319914516,
+      "roc_auc_ovr_weighted": 0.9895025879740449,
+      "precision_macro": 0.8587102159966757,
+      "recall_macro": 0.8850926849415277,
+      "confusion_matrix": [
+        [
+          920,
+          9,
+          1,
+          29,
+          2
+        ],
+        [
+          5,
+          110,
+          0,
+          0,
+          0
+        ],
+        [
+          4,
+          0,
+          53,
+          2,
+          0
+        ],
+        [
+          8,
+          1,
+          1,
+          48,
+          0
+        ],
+        [
+          0,
+          3,
+          0,
+          0,
+          11
+        ]
+      ]
+    },
+    "gradient_boosting": {
+      "accuracy": 0.9552609776304888,
+      "macro_f1": 0.8801004197834154,
+      "weighted_f1": 0.9551535088066404,
+      "roc_auc_ovr_weighted": 0.9869652492838203,
+      "precision_macro": 0.881467674714626,
+      "recall_macro": 0.8804875948895565,
+      "confusion_matrix": [
+        [
+          937,
+          11,
+          1,
+          10,
+          2
+        ],
+        [
+          4,
+          109,
+          0,
+          1,
+          1
+        ],
+        [
+          4,
+          0,
+          53,
+          2,
+          0
+        ],
+        [
+          15,
+          1,
+          0,
+          42,
+          0
+        ],
+        [
+          0,
+          2,
+          0,
+          0,
+          12
+        ]
+      ]
+    },
+    "xgboost": {
+      "accuracy": 0.9544324772162386,
+      "macro_f1": 0.8838236159741101,
+      "weighted_f1": 0.9547093547005485,
+      "roc_auc_ovr_weighted": 0.9890842525869389,
+      "precision_macro": 0.8851484556236601,
+      "recall_macro": 0.8835780830146891,
+      "confusion_matrix": [
+        [
+          935,
+          9,
+          1,
+          14,
+          2
+        ],
+        [
+          6,
+          109,
+          0,
+          0,
+          0
+        ],
+        [
+          4,
+          0,
+          52,
+          3,
+          0
+        ],
+        [
+          13,
+          0,
+          1,
+          44,
+          0
+        ],
+        [
+          0,
+          2,
+          0,
+          0,
+          12
+        ]
+      ]
+    },
+    "lightgbm": {
+      "accuracy": 0.9544324772162386,
+      "macro_f1": 0.8738610076955962,
+      "weighted_f1": 0.9552528634470917,
+      "roc_auc_ovr_weighted": 0.9888141680991397,
+      "precision_macro": 0.8679180827309553,
+      "recall_macro": 0.8824611225414547,
+      "confusion_matrix": [
+        [
+          932,
+          9,
+          1,
+          16,
+          3
+        ],
+        [
+          6,
+          109,
+          0,
+          0,
+          0
+        ],
+        [
+          4,
+          0,
+          52,
+          3,
+          0
+        ],
+        [
+          8,
+          1,
+          1,
+          48,
+          0
+        ],
+        [
+          0,
+          3,
+          0,
+          0,
+          11
+        ]
+      ]
+    }
+  },
+  "selected_production_model": "xgboost",
+  "feature_names": [
+    "median(8,13)",
+    "rms(98,102)",
+    "median(98,102)",
+    "peak1x",
+    "peak2x",
+    "a",
+    "b"
+  ],
+  "note": "All metrics on stratified held-out test. Scaler fit on train.",
+  "trained_at": "2026-11-16T07:54:49.863115Z"
+}

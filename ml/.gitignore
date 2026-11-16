@@ -1,0 +1,11 @@
+# Raw extracted source archives (regenerable from uploads, large — not committed).
+# Only the cleaned/versioned datasets in cleaned/ are committed.
+datasets/raw/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Training-time transient artifacts
+*.log

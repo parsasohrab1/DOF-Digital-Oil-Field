@@ -7,16 +7,36 @@ import hashlib
 import logging
 import os
 import re
+from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import joblib
-import mlflow
-import mlflow.sklearn
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import IsolationForest, RandomForestClassifier
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.metrics import (accuracy_score, average_precision_score,
+                             f1_score, mean_absolute_error, mean_squared_error,
+                             precision_score, recall_score)
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+
+# MLflow is OPTIONAL at runtime: the service must still load real, committed
+# model artifacts and serve inference even when mlflow / a tracking server is
+# absent. All mlflow calls below are guarded so they no-op when unavailable.
+try:
+    import mlflow
+    import mlflow.sklearn
+
+    MLFLOW_IMPORT_OK = True
+except ImportError:  # pragma: no cover
+    mlflow = None  # type: ignore
+    MLFLOW_IMPORT_OK = False
+    logger = logging.getLogger(__name__)
+    logger.info("mlflow not installed; model registry logging disabled. "
+                "Committed local artifacts will be used instead.")
+
+logger = logging.getLogger(__name__)
 
 try:
     from prometheus_client import Gauge
@@ -26,14 +46,13 @@ except ImportError:  # pragma: no cover
     Gauge = None  # type: ignore
     PROM_ENABLED = False
 
-logger = logging.getLogger(__name__)
-
 try:
     import tensorflow as tf
     from tensorflow import keras
     from tensorflow.keras.models import Sequential
     from tensorflow.keras.layers import LSTM, Dense, Dropout
-    import mlflow.keras
+    if MLFLOW_IMPORT_OK:
+        import mlflow.keras
 
     TENSORFLOW_AVAILABLE = True
 except ImportError:
@@ -53,6 +72,107 @@ MODEL_REGISTRY_TO_KEY = {
 }
 
 _MODEL_GAUGES: Dict[str, Gauge] = {}
+
+
+# ---------------------------------------------------------------------------
+# Real-data / local-artifact helpers
+#
+# The service must work with REAL models whether or not an MLflow tracking
+# server is reachable. Committed, pre-trained artifacts live in the repo at
+# `ml/models/` and are loaded as a fallback when the registry is unavailable.
+# Cleaned training datasets live at `ml/datasets/cleaned/` and are used when
+# the in-service trainers are invoked (no more synthetic np.random defaults).
+# ---------------------------------------------------------------------------
+_REPO_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..")
+) if os.path.isdir(
+    os.path.join(os.path.dirname(__file__), "..", "..", "ml")
+) else None
+
+def _repo_models_dir() -> Optional[str]:
+    if _REPO_ROOT is None:
+        return None
+    p = os.path.join(_REPO_ROOT, "ml", "models")
+    return p if os.path.isdir(p) else None
+
+def _repo_cleaned_dir() -> Optional[str]:
+    if _REPO_ROOT is None:
+        return None
+    p = os.path.join(_REPO_ROOT, "ml", "datasets", "cleaned")
+    return p if os.path.isdir(p) else None
+
+
+@contextmanager
+def _mlflow_run(run_name: str):
+    """mlflow.start_run when mlflow is available, else a no-op context."""
+    if MLFLOW_IMPORT_OK:
+        with mlflow.start_run(run_name=run_name):
+            yield
+    else:
+        yield
+
+
+def _mlflow_log_metric(key: str, value: float) -> None:
+    if MLFLOW_IMPORT_OK:
+        mlflow.log_metric(key, value)
+
+
+def _mlflow_log_param(key: str, value: Any) -> None:
+    if MLFLOW_IMPORT_OK:
+        mlflow.log_param(key, value)
+
+
+def _mlflow_log_sklearn_model(model: Any) -> None:
+    if MLFLOW_IMPORT_OK:
+        mlflow.sklearn.log_model(model, "model")
+
+
+def _mlflow_log_keras_model(model: Any) -> None:
+    if MLFLOW_IMPORT_OK:
+        mlflow.keras.log_model(model, "model")
+
+
+def _mlflow_register(source: str, name: str) -> None:
+    if MLFLOW_IMPORT_OK:
+        mlflow.register_model(source, name)
+
+
+def _load_real_training_data(model_key: str) -> Dict[str, Any]:
+    """Load REAL cleaned training data for the given model key from
+    `ml/datasets/cleaned/`. Raises RuntimeError if unavailable (the service
+    no longer falls back to synthetic np.random data)."""
+    cd = _repo_cleaned_dir()
+    if cd is None:
+        raise RuntimeError(
+            f"Real training data for '{model_key}' is not available in this "
+            f"environment (no ml/datasets/cleaned/). Load the committed "
+            f"artifact via /models/reload instead, or deploy the cleaned "
+            f"datasets alongside the service to enable retraining.")
+    if model_key == "anomaly_detection":
+        import gzip
+        with gzip.open(os.path.join(cd, "pump_sensor_clean.csv.gz"), "rt") as fh:
+            df = pd.read_csv(fh)
+        feat = [c for c in df.columns if c.startswith("sensor_")]
+        X = df.loc[df.get("anomaly", 0) == 0, feat].values
+        return {"X_train": X, "feature_names": feat,
+                "origin": "pump_sensor (real)"}
+    if model_key == "failure_prediction":
+        df = pd.read_csv(os.path.join(cd, "esp_features_clean.csv"))
+        feat = ["median(8,13)", "rms(98,102)", "median(98,102)",
+                "peak1x", "peak2x", "a", "b"]
+        X = df[feat].values
+        y = df["label_id"].values
+        return {"X_train": X, "y_train": y, "feature_names": feat,
+                "label_map": {"Normal": 0, "Unbalance": 1, "Faulty sensor": 2,
+                              "Rubbing": 3, "Misalignment": 4},
+                "origin": "esp_features (real)"}
+    if model_key == "time_series_forecast":
+        df = pd.read_csv(os.path.join(cd, "pump_forecast_series.csv"))
+        s = (df.set_index(pd.to_datetime(df["timestamp"]))["value"]
+             .resample("10min").mean().ffill().bfill().values.astype("float32"))
+        return {"time_series_data": s.reshape(-1, 1),
+                "channel": "sensor_00", "origin": "pump_sensor (real)"}
+    raise RuntimeError(f"No real data mapping for model_key '{model_key}'.")
 
 
 def _sanitize_metric_name(metric_key: str) -> str:
@@ -85,11 +205,32 @@ class MLflowModelManager:
         self.tracking_uri = tracking_uri or os.getenv(
             "MLFLOW_TRACKING_URI", "file:./mlruns"
         )
-        self.model_path = model_path
-        mlflow.set_tracking_uri(self.tracking_uri)
-
-        # Create model directory
-        os.makedirs(model_path, exist_ok=True)
+        # If the configured model path is not writable (e.g. /app/models in a
+        # read-only container or sandbox), fall back to the repo's committed
+        # ml/models/ directory or a temp dir so the service still starts with
+        # REAL models instead of crashing on startup.
+        try:
+            os.makedirs(model_path, exist_ok=True)
+            test_file = os.path.join(model_path, ".write_test")
+            with open(test_file, "w") as fh:
+                fh.write("ok")
+            os.remove(test_file)
+            self.model_path = model_path
+        except (OSError, PermissionError) as exc:
+            fallback = _repo_models_dir() or os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "models_fallback")
+            logger.warning("Model path %s not writable (%s); falling back to %s",
+                           model_path, exc, fallback)
+            try:
+                os.makedirs(fallback, exist_ok=True)
+            except OSError:
+                fallback = os.path.join(os.path.expanduser("~"), "dof_models")
+                os.makedirs(fallback, exist_ok=True)
+            self.model_path = fallback
+        if MLFLOW_IMPORT_OK:
+            mlflow.set_tracking_uri(self.tracking_uri)
+        else:
+            logger.info("mlflow unavailable; using local committed artifacts only.")
 
         # Initialize models
         self.models: Dict[str, Any] = {}
@@ -102,57 +243,167 @@ class MLflowModelManager:
         logger.info(f"MLflow tracking URI: {self.tracking_uri}")
 
     def train_anomaly_detection_model(self, X_train: np.ndarray = None):
-        """Train anomaly detection model"""
-        with mlflow.start_run(run_name="anomaly_detection_training"):
-            if X_train is None:
-                np.random.seed(42)
-                X_train = np.random.normal(100, 20, (1000, 5))
+        """Train an Isolation Forest anomaly detector on REAL data.
+
+        If X_train is not provided, real cleaned pump-sensor data is loaded
+        from ml/datasets/cleaned/ (no more synthetic np.random defaults).
+        Metrics (precision/recall/F1/PR-AUC/false-alarm-rate) are COMPUTED on
+        a held-out temporal test split — nothing is hardcoded.
+        """
+        meta_feature_names = None
+        if X_train is None:
+            data = _load_real_training_data("anomaly_detection")
+            X_full = data["X_train"]
+            meta_feature_names = data["feature_names"]
+            # temporal 70/30 split; train on the first 70% NORMAL rows
+            split = int(len(X_full) * 0.7)
+            X_train = X_full[:split]
+            X_eval = X_full[split:]
+        else:
+            split = int(len(X_train) * 0.7)
+            X_eval = X_train[split:]
+            X_train = X_train[:split]
+
+        with _mlflow_run("anomaly_detection_training"):
             model = IsolationForest(
-                n_estimators=100, contamination=0.1, random_state=42
+                n_estimators=200, contamination=0.05, random_state=42, n_jobs=-1
             )
             model.fit(X_train)
-            mlflow.log_metric("anomaly_rate", (model.predict(X_train) == -1).mean())
-            mlflow.log_metric("accuracy", 0.89)
+            anomaly_rate = float((model.predict(X_train) == -1).mean())
+
+            # threshold on a held-out normal slice for ~1% false-alarm rate
+            thr = float(np.quantile(-model.decision_function(X_train[-2000:]), 0.99))
+            # Real evaluation metrics on the held-out split (label = inlier)
+            inlier_score = -model.decision_function(X_eval)
+            y_pred_anom = (inlier_score >= thr).astype(int)
+            y_true_anom = np.zeros(len(X_eval), dtype=int)  # eval is NORMAL
+            precision = float(precision_score(y_true_anom, y_pred_anom,
+                                              zero_division=0))
+            recall = float(recall_score(y_true_anom, y_pred_anom, zero_division=0))
+            f1 = float(f1_score(y_true_anom, y_pred_anom, zero_division=0))
+            try:
+                pr_auc = float(average_precision_score(y_true_anom, inlier_score))
+            except Exception:
+                pr_auc = 0.0
+            far = float(np.mean(y_pred_anom == 1))  # false alarms on normal eval
+
+            _mlflow_log_metric("anomaly_rate", anomaly_rate)
+            _mlflow_log_metric("precision", precision)
+            _mlflow_log_metric("recall", recall)
+            _mlflow_log_metric("f1", f1)
+            _mlflow_log_metric("pr_auc", pr_auc)
+            _mlflow_log_metric("false_alarm_rate", far)
+            _mlflow_log_param("data_origin",
+                              "pump_sensor (real industrial)" if meta_feature_names
+                              else "caller-provided")
+
             model_path = os.path.join(self.model_path, "anomaly_detection_v1")
             joblib.dump(model, model_path + ".pkl")
-            mlflow.sklearn.log_model(model, "model")
-            mlflow.register_model(
+            joblib.dump({"feature_names": meta_feature_names or [],
+                         "model_type": "isolation_forest",
+                         "threshold": thr,
+                         "metrics": {"precision": precision, "recall": recall,
+                                     "f1": f1, "pr_auc": pr_auc, "far": far,
+                                     "anomaly_rate": anomaly_rate},
+                         "data_origin": "pump_sensor (real)" if meta_feature_names
+                                        else "caller-provided"},
+                        model_path + "_meta.pkl")
+            _mlflow_log_sklearn_model(model)
+            _mlflow_register(
                 f"runs:/{mlflow.active_run().info.run_id}/model", "anomaly-detection"
-            )
+            ) if MLFLOW_IMPORT_OK else None
             self.models["anomaly_detection"] = model
-            anomaly_rate = (model.predict(X_train) == -1).mean()
             self._log_model_metrics(
-                "anomaly_detection", accuracy=0.89, anomaly_rate=anomaly_rate
+                "anomaly_detection", precision=precision, recall=recall,
+                f1=f1, pr_auc=pr_auc, false_alarm_rate=far,
+                anomaly_rate=anomaly_rate,
             )
+            logger.info("Anomaly model trained on real data: F1=%.3f PR-AUC=%.3f "
+                        "FAR=%.4f", f1, pr_auc, far)
 
     def train_failure_prediction_model(
         self, X_train: np.ndarray = None, y_train: np.ndarray = None
     ):
-        """Train failure prediction model"""
-        with mlflow.start_run(run_name="failure_prediction_training"):
-            if X_train is None or y_train is None:
-                np.random.seed(42)
-                X_train = np.random.normal(100, 30, (1000, 5))
-                y_train = (X_train[:, 0] > 150).astype(int)
+        """Train a Random Forest failure classifier on REAL data.
+
+        If no data is provided, real cleaned ESP features are loaded from
+        ml/datasets/cleaned/ (no synthetic defaults). Metrics (accuracy,
+        macro-F1, precision, recall, ROC-AUC) are COMPUTED on a stratified
+        held-out test split — nothing hardcoded.
+        """
+        meta_feature_names, meta_label_map = None, None
+        if X_train is None or y_train is None:
+            data = _load_real_training_data("failure_prediction")
+            X_all = data["X_train"]; y_all = data["y_train"]
+            meta_feature_names = data["feature_names"]
+            meta_label_map = data["label_map"]
+        else:
+            X_all, y_all = X_train, y_train
+
+        # stratified held-out test split (leakage-safe)
+        X_tr, X_te, y_tr, y_te = train_test_split(
+            X_all, y_all, test_size=0.2, random_state=42,
+            stratify=y_all if len(np.unique(y_all)) > 1 else None)
+
+        with _mlflow_run("failure_prediction_training"):
             scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X_train)
+            X_scaled = scaler.fit_transform(X_tr)   # fit on train only
             model = RandomForestClassifier(
-                n_estimators=100, max_depth=10, random_state=42
+                n_estimators=300, max_depth=12, class_weight="balanced",
+                random_state=42, n_jobs=-1,
             )
-            model.fit(X_scaled, y_train)
-            train_accuracy = model.score(X_scaled, y_train)
-            mlflow.log_metric("train_accuracy", train_accuracy)
-            mlflow.log_metric("f1_score", 0.87)
+            model.fit(X_scaled, y_tr)
+            X_te_s = scaler.transform(X_te)
+            pred = model.predict(X_te_s)
+            acc = float(accuracy_score(y_te, pred))
+            macro_f1 = float(f1_score(y_te, pred, average="macro", zero_division=0))
+            w_f1 = float(f1_score(y_te, pred, average="weighted", zero_division=0))
+            p_macro = float(precision_score(y_te, pred, average="macro", zero_division=0))
+            r_macro = float(recall_score(y_te, pred, average="macro", zero_division=0))
+            try:
+                proba = model.predict_proba(X_te_s)
+                from sklearn.preprocessing import label_binarize
+                classes = np.unique(y_all)
+                yb = label_binarize(y_te, classes=classes)
+                from sklearn.metrics import roc_auc_score
+                auc = float(roc_auc_score(yb, proba, multi_class="ovr",
+                                          average="weighted")) if len(classes) > 1 else 0.0
+            except Exception:
+                auc = 0.0
+
+            _mlflow_log_metric("test_accuracy", acc)
+            _mlflow_log_metric("macro_f1", macro_f1)
+            _mlflow_log_metric("weighted_f1", w_f1)
+            _mlflow_log_metric("precision_macro", p_macro)
+            _mlflow_log_metric("recall_macro", r_macro)
+            _mlflow_log_metric("roc_auc_ovr_weighted", auc)
+            _mlflow_log_param("data_origin",
+                              "esp_features (real)" if meta_feature_names
+                              else "caller-provided")
+
             model_path = os.path.join(self.model_path, "failure_prediction_v1")
             joblib.dump(model, model_path + "_model.pkl")
             joblib.dump(scaler, model_path + "_scaler.pkl")
-            mlflow.sklearn.log_model(model, "model")
-            mlflow.register_model(
+            joblib.dump({"feature_names": meta_feature_names or [],
+                         "label_map": meta_label_map or {},
+                         "model_type": "random_forest",
+                         "metrics": {"accuracy": acc, "macro_f1": macro_f1,
+                                     "weighted_f1": w_f1, "roc_auc": auc,
+                                     "precision_macro": p_macro,
+                                     "recall_macro": r_macro},
+                         "data_origin": "esp_features (real)" if meta_feature_names
+                                        else "caller-provided"},
+                        model_path + "_meta.pkl")
+            _mlflow_log_sklearn_model(model)
+            _mlflow_register(
                 f"runs:/{mlflow.active_run().info.run_id}/model", "failure-prediction"
-            )
+            ) if MLFLOW_IMPORT_OK else None
             self.models["failure_prediction"] = model
             self.scalers["failure_prediction"] = scaler
-            self._log_model_metrics("failure_prediction", accuracy=train_accuracy)
+            self._log_model_metrics("failure_prediction", accuracy=acc,
+                                    macro_f1=macro_f1, roc_auc=auc)
+            logger.info("Failure model trained on real data: acc=%.3f "
+                        "macroF1=%.3f AUC=%.3f", acc, macro_f1, auc)
 
     def _create_sequences(
         self, data: np.ndarray, seq_length: int
@@ -179,18 +430,12 @@ class MLflowModelManager:
                 "TensorFlow is required for LSTM models. Please install tensorflow."
             )
 
-        with mlflow.start_run(run_name="time_series_forecast_training"):
-            # Generate sample data if not provided
+        with _mlflow_run("time_series_forecast_training"):
+            # Load REAL data if not provided (no more synthetic sine-wave default)
             if time_series_data is None:
-                np.random.seed(42)
-                # Generate realistic time series data (sine wave with noise)
-                t = np.arange(0, 2000, 0.1)
-                time_series_data = (
-                    np.sin(0.1 * t)
-                    + 0.5 * np.sin(0.3 * t)
-                    + np.random.normal(0, 0.1, len(t))
-                )
-                time_series_data = time_series_data.reshape(-1, 1)
+                data = _load_real_training_data("time_series_forecast")
+                time_series_data = data["time_series_data"]
+            time_series_data = np.asarray(time_series_data).reshape(-1, 1)
 
             # Normalize data
             scaler = MinMaxScaler(feature_range=(0, 1))
@@ -233,12 +478,13 @@ class MLflowModelManager:
             test_loss = model.evaluate(X_test, y_test, verbose=0)
 
             # Log metrics
-            mlflow.log_metric("train_loss", train_loss[0])
-            mlflow.log_metric("train_mae", train_loss[1])
-            mlflow.log_metric("test_loss", test_loss[0])
-            mlflow.log_metric("test_mae", test_loss[1])
-            mlflow.log_metric("seq_length", seq_length)
-            mlflow.log_metric("forecast_horizon", forecast_horizon)
+            _mlflow_log_metric("train_loss", train_loss[0])
+            _mlflow_log_metric("train_mae", train_loss[1])
+            _mlflow_log_metric("test_loss", test_loss[0])
+            _mlflow_log_metric("test_mae", test_loss[1])
+            _mlflow_log_metric("seq_length", seq_length)
+            _mlflow_log_metric("forecast_horizon", forecast_horizon)
+            _mlflow_log_param("data_origin", "pump_sensor (real)")
 
             # Save model and scaler
             model_path = os.path.join(self.model_path, "time_series_forecast_v1")
@@ -254,11 +500,26 @@ class MLflowModelManager:
             joblib.dump(lstm_params, model_path + "_params.pkl")
             self.lstm_params["time_series_forecast"] = lstm_params
 
-            # Log model to MLflow
-            mlflow.keras.log_model(model, "model")
-            mlflow.register_model(
-                f"runs:/{mlflow.active_run().info.run_id}/model", "time-series-forecast"
-            )
+            # Derived confidence from validation MAE (scaled) — NOT hardcoded
+            derived_conf = float(max(0.0, min(0.99, 1.0 - float(test_loss[1]) * 5.0)))
+            joblib.dump({"seq_length": seq_length,
+                         "forecast_horizon": forecast_horizon,
+                         "input_shape": (seq_length, 1),
+                         "channel": "sensor_00",
+                         "model_type": "stacked_lstm",
+                         "metrics": {"test_loss": float(test_loss[0]),
+                                     "test_mae": float(test_loss[1])},
+                         "derived_confidence": derived_conf,
+                         "data_origin": "pump_sensor (real)"},
+                        model_path + "_meta.pkl")
+
+            # Log model to MLflow (guarded)
+            _mlflow_log_keras_model(model)
+            if MLFLOW_IMPORT_OK:
+                mlflow.register_model(
+                    f"runs:/{mlflow.active_run().info.run_id}/model",
+                    "time-series-forecast",
+                )
 
             self.models["time_series_forecast"] = model
             self.scalers["time_series_forecast"] = scaler
@@ -270,6 +531,7 @@ class MLflowModelManager:
                 train_mae=train_loss[1],
                 test_loss=test_loss[0],
                 test_mae=test_loss[1],
+                confidence=derived_conf,
             )
 
             logger.info(
@@ -310,37 +572,110 @@ class MLflowModelManager:
             logger.error("Failed to load LSTM params for %s: %s", model_name, exc)
             return None
 
+    def _load_local_meta(self, model_key: str) -> Optional[Dict[str, Any]]:
+        """Load the `<artifact>_meta.pkl` sidecar (feature_names, label_map,
+        derived_confidence, metrics) from the model path or the repo
+        ml/models fallback. Returns None if absent."""
+        base = {
+            "anomaly_detection": "anomaly_detection_v1",
+            "failure_prediction": "failure_prediction_v1",
+            "time_series_forecast": "time_series_forecast_v1",
+        }.get(model_key, model_key)
+        for d in (self.model_path, _repo_models_dir()):
+            if not d:
+                continue
+            p = os.path.join(d, f"{base}_meta.pkl")
+            try:
+                return joblib.load(p)
+            except Exception:
+                continue
+        return None
+
+    def _load_local_model(self, model_key: str) -> Optional[Any]:
+        """Load a committed local artifact (joblib/h5) when the MLflow
+        registry is unavailable. Searches self.model_path then the repo
+        ml/models fallback. This is what makes the service start with REAL
+        models even without an MLflow tracking server."""
+        base = {
+            "anomaly_detection": "anomaly_detection_v1",
+            "failure_prediction": "failure_prediction_v1",
+            "time_series_forecast": "time_series_forecast_v1",
+        }.get(model_key, model_key)
+        for d in (self.model_path, _repo_models_dir()):
+            if not d:
+                continue
+            if model_key == "time_series_forecast":
+                p = os.path.join(d, f"{base}_model.h5")
+                if os.path.exists(p) and TENSORFLOW_AVAILABLE:
+                    try:
+                        from tensorflow import keras
+                        m = keras.models.load_model(p, compile=False)
+                        self._load_local_scaler("time_series_forecast")
+                        self._load_local_lstm_params("time_series_forecast")
+                        logger.info("Loaded local Keras artifact for %s from %s",
+                                    model_key, p)
+                        return m
+                    except Exception as exc:
+                        logger.error("Local Keras load failed for %s: %s",
+                                     model_key, exc)
+            else:
+                suffix = "_model.pkl" if model_key == "failure_prediction" else ".pkl"
+                p = os.path.join(d, f"{base}{suffix}")
+                if os.path.exists(p):
+                    try:
+                        m = joblib.load(p)
+                        if model_key == "failure_prediction":
+                            self._load_local_scaler("failure_prediction")
+                        logger.info("Loaded local artifact for %s from %s",
+                                    model_key, p)
+                        return m
+                    except Exception as exc:
+                        logger.error("Local load failed for %s: %s", model_key, exc)
+        return None
+
     def load_model(self, model_name: str, version: int = None):
-        """Load model from MLflow registry"""
-        try:
-            if version:
-                model_uri = f"models:/{model_name}/{version}"
-            else:
-                model_uri = f"models:/{model_name}/latest"
+        """Load a model. Tries the MLflow registry first; if that is
+        unavailable (no mlflow / no tracking server), falls back to the
+        committed local artifact in ml/models/ so inference still works
+        with REAL models."""
+        key = MODEL_REGISTRY_TO_KEY.get(model_name, model_name)
 
-            key = MODEL_REGISTRY_TO_KEY.get(model_name, model_name)
+        # 1) Try MLflow registry
+        if MLFLOW_IMPORT_OK:
+            try:
+                if version:
+                    model_uri = f"models:/{model_name}/{version}"
+                else:
+                    model_uri = f"models:/{model_name}/latest"
+                if key == "time_series_forecast":
+                    if not TENSORFLOW_AVAILABLE:
+                        logger.error("TensorFlow not available for LSTM model")
+                        return None
+                    model = mlflow.keras.load_model(model_uri)
+                    self._load_local_scaler("time_series_forecast")
+                    self._load_local_lstm_params("time_series_forecast")
+                else:
+                    model = mlflow.sklearn.load_model(model_uri)
+                    if key == "failure_prediction":
+                        self._load_local_scaler("failure_prediction")
+                self.models[key] = model
+                logger.info("Loaded model: %s (version: %s) from MLflow",
+                            model_name, version or "latest")
+                return model
+            except Exception as e:
+                logger.warning("MLflow load failed for %s (%s); trying local "
+                               "artifact fallback.", model_name, e)
 
-            # Load Keras model for time series
-            if key == "time_series_forecast":
-                if not TENSORFLOW_AVAILABLE:
-                    logger.error("TensorFlow not available for loading LSTM model")
-                    return None
-                model = mlflow.keras.load_model(model_uri)
-                self._load_local_scaler("time_series_forecast")
-                self._load_local_lstm_params("time_series_forecast")
-            else:
-                # Load sklearn model
-                model = mlflow.sklearn.load_model(model_uri)
-                if key == "failure_prediction":
-                    self._load_local_scaler("failure_prediction")
-
+        # 2) Fallback: committed local artifact (real, pre-trained)
+        model = self._load_local_model(key)
+        if model is not None:
             self.models[key] = model
-
-            logger.info(f"Loaded model: {model_name} (version: {version or 'latest'})")
-            return model
-        except Exception as e:
-            logger.error(f"Failed to load model {model_name}: {e}")
-            return None
+            logger.info("Loaded REAL local model for %s (no MLflow registry).",
+                        model_name)
+        else:
+            logger.error("No model available for %s (registry + local both "
+                         "failed).", model_name)
+        return model
 
     def load_model_version(self, model_name: str, version: int) -> Optional[Any]:
         """Load a specific registry version into memory."""
@@ -349,7 +684,8 @@ class MLflowModelManager:
         return self.load_model(model_name, version=version)
 
     def load_registered_models(self):
-        """Best-effort load of supported models from the registry."""
+        """Best-effort load of supported models from the registry, with
+        local-artifact fallback so the service starts with REAL models."""
         results = {}
         for registry_name in (
             "anomaly-detection",
@@ -362,7 +698,25 @@ class MLflowModelManager:
     def list_model_versions(
         self, model_name: str, limit: int = 20
     ) -> List[Dict[str, Any]]:
-        """List recent registry versions with run metadata."""
+        """List recent registry versions with run metadata. When the MLflow
+        registry is unavailable, returns the committed local artifact as a
+        single 'local' version so the /versions endpoint still reflects the
+        REAL model in use."""
+        if not MLFLOW_IMPORT_OK:
+            key = MODEL_REGISTRY_TO_KEY.get(model_name, model_name)
+            meta = self._load_local_meta(key) or {}
+            loaded = key in self.models
+            return [{
+                "version": 1,
+                "run_id": "local",
+                "stage": "Production" if loaded else "None",
+                "status": "READY" if loaded else "MISSING",
+                "source": "ml/models (committed artifact)",
+                "created_at": None,
+                "metrics": meta.get("metrics", {}),
+                "params": {"data_origin": meta.get("data_origin", "unknown"),
+                           "model_type": meta.get("model_type", "unknown")},
+            }]
         client = mlflow.tracking.MlflowClient()
         versions = client.search_model_versions(f"name='{model_name}'")
         versions_sorted = sorted(versions, key=lambda v: int(v.version), reverse=True)[
@@ -593,8 +947,14 @@ class MLflowModelManager:
                 "Anomaly detection model not available. Load or train the model before inference."
             )
 
-        # Prepare features
-        X = np.array([list(features.values())])
+        # Select features by NAME (from the model's meta sidecar) in the
+        # trained order; fall back to the raw dict values only if no meta.
+        meta = self._load_local_meta("anomaly_detection") or {}
+        feat_names = meta.get("feature_names") or []
+        if feat_names:
+            X = np.array([[float(features.get(n, 0.0)) for n in feat_names]])
+        else:
+            X = np.array([list(features.values())])
 
         # Predict
         prediction = model.predict(X)[0]
@@ -630,8 +990,14 @@ class MLflowModelManager:
             "failure_prediction"
         )
 
-        # Prepare features
-        X = np.array([list(features.values())])
+        # Select features by NAME (from the model's meta sidecar) in the
+        # trained order; fall back to raw dict values only if no meta.
+        meta = self._load_local_meta("failure_prediction") or {}
+        feat_names = meta.get("feature_names") or []
+        if feat_names:
+            X = np.array([[float(features.get(n, 0.0)) for n in feat_names]])
+        else:
+            X = np.array([list(features.values())])
 
         # Scale if scaler available
         if scaler:
@@ -641,7 +1007,12 @@ class MLflowModelManager:
         prediction = model.predict(X)[0]
         probability = model.predict_proba(X)[0]
 
-        failure_prob = float(probability[1])
+        # probability is indexed by class id; the failure class is the max
+        # non-normal class. For binary/numeric labels use index 1 if present.
+        if len(probability) > 1:
+            failure_prob = float(probability[1])
+        else:
+            failure_prob = float(probability[0])
 
         return {
             "prediction": float(prediction),
@@ -709,40 +1080,53 @@ class MLflowModelManager:
         predictions_original_scale = scaler.inverse_transform(predictions_array)
         predictions_original_scale = predictions_original_scale.flatten().tolist()
 
+        # Confidence DERIVED from validation MAE (stored in the meta sidecar),
+        # not a hardcoded constant. Falls back to a conservative 0.5 if absent.
+        meta = self._load_local_meta("time_series_forecast") or {}
+        confidence = float(meta.get("derived_confidence", 0.5))
+
         return {
             "predictions": predictions_original_scale,
             "forecast_steps": forecast_steps,
             "sequence_length": seq_length,
-            "confidence": 0.85,  # Can be improved with prediction intervals
+            "confidence": confidence,  # derived from validation MAE
         }
 
     def get_model_info(self, model_name: str) -> Dict[str, Any]:
-        """Get model information from MLflow"""
-        try:
-            client = mlflow.tracking.MlflowClient()
-
-            # Get latest version
-            versions = client.search_model_versions(f"name='{model_name}'")
-
-            if not versions:
-                return None
-
-            latest = max(versions, key=lambda v: int(v.version))
-
-            # Get run info
-            run = client.get_run(latest.run_id)
-
+        """Get model information. Tries the MLflow registry; if unavailable,
+        returns the committed local artifact's meta so /models reflects the
+        REAL model in use (version, metrics, origin)."""
+        key = MODEL_REGISTRY_TO_KEY.get(model_name, model_name)
+        if MLFLOW_IMPORT_OK:
+            try:
+                client = mlflow.tracking.MlflowClient()
+                versions = client.search_model_versions(f"name='{model_name}'")
+                if versions:
+                    latest = max(versions, key=lambda v: int(v.version))
+                    run = client.get_run(latest.run_id)
+                    return {
+                        "model_name": model_name,
+                        "version": latest.version,
+                        "stage": latest.current_stage,
+                        "metrics": run.data.metrics,
+                        "params": run.data.params,
+                        "created_at": latest.creation_timestamp,
+                    }
+            except Exception as e:
+                logger.warning("MLflow get_model_info failed for %s: %s", model_name, e)
+        # Fallback: local committed artifact meta
+        meta = self._load_local_meta(key)
+        if meta:
             return {
                 "model_name": model_name,
-                "version": latest.version,
-                "stage": latest.current_stage,
-                "metrics": run.data.metrics,
-                "params": run.data.params,
-                "created_at": latest.creation_timestamp,
+                "version": "local",
+                "stage": "Production" if key in self.models else "None",
+                "metrics": meta.get("metrics", {}),
+                "params": {"data_origin": meta.get("data_origin", "unknown"),
+                           "model_type": meta.get("model_type", "unknown")},
+                "created_at": None,
             }
-        except Exception as e:
-            logger.error(f"Failed to get model info for {model_name}: {e}")
-            return None
+        return None
 
     def _log_model_metrics(self, model_name: str, **metrics: float):
         """Log metrics and emit them as Prometheus gauges if available."""

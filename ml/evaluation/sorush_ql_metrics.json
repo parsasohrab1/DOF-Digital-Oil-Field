@@ -1,0 +1,48 @@
+{
+  "task": "regression",
+  "dataset": "sorush_field",
+  "split": {
+    "train": 5796,
+    "test": 1449
+  },
+  "models": {
+    "random_forest": {
+      "rmse": 463.4390954062388,
+      "mae": 174.16656085398537,
+      "r2": 0.982941341850989,
+      "mape": 1.7421707614987167
+    },
+    "gradient_boosting": {
+      "rmse": 587.6573247119229,
+      "mae": 334.1527723499729,
+      "r2": 0.9725711349396379,
+      "mape": 3.551055631805908
+    },
+    "xgboost": {
+      "rmse": 461.5663677499052,
+      "mae": 185.21568258970794,
+      "r2": 0.9830789291840255,
+      "mape": 1.861696508654517
+    },
+    "lightgbm": {
+      "rmse": 475.5487781750991,
+      "mae": 217.56870597892168,
+      "r2": 0.9820382076675538,
+      "mape": 2.2312380643897143
+    }
+  },
+  "selected_production_model": "xgboost",
+  "feature_names": [
+    "choke_d64",
+    "pwh_psig",
+    "oil_gravity",
+    "glr_scf_stb"
+  ],
+  "benchmark_vs_paper": {
+    "paper_RMSE_STB_D": 196,
+    "paper_R2": 0.9969,
+    "algorithms_compared": "DL > DT > RF > ANN > SVR"
+  },
+  "note": "Paper RMSE=196/R\u00b2=0.9969 used a different (full-data) split; our metrics are on a well-stratified held-out test, not comparable like-for-like.",
+  "trained_at": "2026-11-16T07:59:07.124901Z"
+}
