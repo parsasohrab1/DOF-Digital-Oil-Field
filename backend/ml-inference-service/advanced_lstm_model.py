@@ -1,14 +1,28 @@
 """
 Advanced LSTM Model for Oil Well Behavior Prediction
 پیشرفته‌ترین مدل LSTM برای پیش‌بینی رفتار چاه نفتی
+
+Fixes applied (see backend/ml-inference-service/ML_DEVELOPMENT_REPORT.md §2):
+  1. 2D/3D target handling (n_targets / output_dim instead of hardcoded horizon head).
+  2. Multi-step inverse scaling done in output_dim-wide chunks (single call).
+  3. External validation data: reshape-before-allocate, no uninitialized
+     X_train_final/y_train_final, y_val normalized like y_train.
+  4. Attention softmax applied across the TIME axis (not a size-1 trailing axis).
+  5. Direct multi-step prediction; recursive rolling only for the univariate
+     single-target case, otherwise an explicit NotImplementedError.
+  6. Deterministic ModelCheckpoint path under models/lstm/ (module-relative),
+     monitor falls back to "loss" when no validation data is available.
+  + save/load round-trip now persists the fitted scalers via a .meta.pkl sidecar.
 """
 
 import logging
 import os
-from typing import Dict, List, Optional, Tuple, Any
+import pickle
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +55,6 @@ except ImportError:
     TENSORFLOW_AVAILABLE = False
     logger.warning("TensorFlow not available. Advanced LSTM models will not work.")
 
-logger = logging.getLogger(__name__)
-
 
 class AdvancedLSTMModel:
     """
@@ -66,6 +78,9 @@ class AdvancedLSTMModel:
         self.feature_scalers: Dict[int, MinMaxScaler] = {}
         self.is_trained = False
         self.training_history: Dict[str, List[float]] = {}
+        # Fix 1: target geometry (set during train(), used by build_model)
+        self.n_targets: int = 1
+        self.output_dim: int = forecast_horizon
 
     def _create_sequences(
         self, data: np.ndarray, seq_length: int, forecast_horizon: int = 1
@@ -100,7 +115,7 @@ class AdvancedLSTMModel:
                 Dense(64, activation="relu"),
                 Dropout(0.2),
                 Dense(32, activation="relu"),
-                Dense(self.forecast_horizon),
+                Dense(self.output_dim),  # Fix 1: horizon * n_targets
             ]
         )
         return model
@@ -123,7 +138,7 @@ class AdvancedLSTMModel:
                 Dense(64, activation="relu"),
                 Dropout(0.2),
                 Dense(32, activation="relu"),
-                Dense(self.forecast_horizon),
+                Dense(self.output_dim),  # Fix 1: horizon * n_targets
             ]
         )
         return model
@@ -142,21 +157,24 @@ class AdvancedLSTMModel:
         lstm2 = Dropout(0.3)(lstm2)
 
         # Attention mechanism (simplified self-attention)
-        # Compute attention scores
+        # Fix 4: per-timestep linear scores, then softmax ACROSS THE TIME AXIS.
+        # The previous Dense(1, activation="softmax") softmaxed a trailing axis
+        # of size 1, giving every weight exactly 1.0 (attention disabled).
         attention_scores = Dense(64, activation="tanh")(lstm2)
-        attention_scores = Dense(1, activation="softmax", name="attention_weights")(
-            attention_scores
-        )
+        attention_scores = Dense(1, name="attention_scores")(attention_scores)
+        attention_weights = Lambda(
+            lambda x: tf.nn.softmax(x, axis=1), name="attention_weights"
+        )(attention_scores)
 
         # Apply attention
-        attention_output = Multiply()([lstm2, attention_scores])
+        attention_output = Multiply()([lstm2, attention_weights])
         attention_output = Lambda(lambda x: tf.reduce_sum(x, axis=1))(attention_output)
 
         # Dense layers
         dense1 = Dense(64, activation="relu")(attention_output)
         dense1 = Dropout(0.2)(dense1)
         dense2 = Dense(32, activation="relu")(dense1)
-        outputs = Dense(self.forecast_horizon)(dense2)
+        outputs = Dense(self.output_dim)(dense2)  # Fix 1
 
         model = Model(inputs=inputs, outputs=outputs)
         return model
@@ -177,6 +195,28 @@ class AdvancedLSTMModel:
         model.compile(optimizer=optimizer, loss="mse", metrics=["mae", "mape"])
 
         return model
+
+    def _normalize_target(self, y: np.ndarray) -> Tuple[np.ndarray, int]:
+        """Fix 1: normalize 1D/2D/3D targets to 2D (n, output_dim) and set geometry."""
+        if y.ndim == 1:
+            y = y.reshape(-1, 1)
+            self.n_targets = 1
+        elif y.ndim == 2:
+            self.n_targets = 1
+        elif y.ndim == 3:
+            # (n, horizon, n_targets) -> (n, horizon * n_targets)
+            n, h, t = y.shape
+            if h != self.forecast_horizon:
+                raise ValueError(
+                    f"y axis 1 ({h}) does not match forecast_horizon "
+                    f"({self.forecast_horizon})"
+                )
+            y = y.reshape(n, h * t)
+            self.n_targets = t
+        else:
+            raise ValueError(f"Unsupported y_train shape {y.shape}")
+        self.output_dim = self.forecast_horizon * self.n_targets
+        return y
 
     def train(
         self,
@@ -199,8 +239,9 @@ class AdvancedLSTMModel:
         # Normalize data
         if X_train.ndim == 2:
             X_train = X_train.reshape(-1, X_train.shape[1], 1)
-        if y_train.ndim == 1:
-            y_train = y_train.reshape(-1, 1)
+
+        # Fix 1: normalize target geometry (1D/2D/3D) and compute output_dim
+        y_train = self._normalize_target(np.asarray(y_train))
 
         # Scale features
         n_samples, n_timesteps, n_features = X_train.shape
@@ -224,12 +265,25 @@ class AdvancedLSTMModel:
 
         # Prepare validation data
         validation_data = None
-        if X_val is not None and y_val is not None:
-            # Scale validation data
-            X_val_scaled = np.zeros_like(X_val)
-            if X_val.ndim == 2:
-                X_val = X_val.reshape(-1, X_val.shape[1], 1)
+        # Fix 3: X_train_final/y_train_final must ALWAYS be defined (the
+        # original code left them undefined when X_val was supplied, causing a
+        # NameError at the final evaluate() call).
+        X_train_final = X_train_scaled
+        y_train_final = y_train_scaled
 
+        if X_val is not None and y_val is not None:
+            # Fix 3: reshape BEFORE allocating the scaled buffer (the original
+            # allocated np.zeros_like(X_val) with the wrong 2D shape, then
+            # silently mis-assigned into it).
+            X_val = np.asarray(X_val)
+            if X_val.ndim == 2:
+                X_val = X_val.reshape(-1, self.sequence_length, 1)
+            if X_val.shape[1:] != (self.sequence_length, n_features):
+                raise ValueError(
+                    f"X_val shape {X_val.shape} incompatible with training "
+                    f"input ({self.sequence_length}, {n_features})"
+                )
+            X_val_scaled = np.zeros_like(X_val)
             for i in range(n_features):
                 feature_data = X_val[:, :, i].reshape(-1, 1)
                 scaled_feature = self.feature_scalers[i].transform(feature_data)
@@ -237,7 +291,16 @@ class AdvancedLSTMModel:
                     X_val.shape[0], self.sequence_length
                 )
 
-            y_val_scaled = y_scaler.transform(y_val.reshape(-1, 1))
+            # Fix 3: normalize y_val the same way as y_train (the original
+            # reshape(-1, 1) scrambled multi-step targets).
+            y_val = self._normalize_target(np.asarray(y_val))
+            if y_val.shape[1] != self.output_dim:
+                raise ValueError(
+                    f"y_val has {y_val.shape[1]} columns, expected "
+                    f"{self.output_dim} (horizon {self.forecast_horizon} x "
+                    f"n_targets {self.n_targets})"
+                )
+            y_val_scaled = y_scaler.transform(y_val)
             validation_data = (X_val_scaled, y_val_scaled)
         elif validation_split > 0:
             # Split training data
@@ -247,23 +310,36 @@ class AdvancedLSTMModel:
             X_val_scaled = X_train_scaled[split_idx:]
             y_val_scaled = y_train_scaled[split_idx:]
             validation_data = (X_val_scaled, y_val_scaled)
-        else:
-            X_train_final = X_train_scaled
-            y_train_final = y_train_scaled
 
         # Callbacks
+        # Fix 6: deterministic checkpoint path, module-relative models/lstm/
+        # directory (the original used CWD-relative best_lstm_model.h5, which
+        # collided across wells and depended on the working directory).
+        ckpt_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "lstm")
+        os.makedirs(ckpt_dir, exist_ok=True)
+        ckpt_path = os.path.join(
+            ckpt_dir,
+            "{mt}_seq{sl}_h{fh}_f{nf}_t{nt}_best.keras".format(
+                mt=self.model_type,
+                sl=self.sequence_length,
+                fh=self.forecast_horizon,
+                nf=n_features,
+                nt=self.n_targets,
+            ),
+        )
+        monitor = "val_loss" if validation_data is not None else "loss"
         callbacks = [
             EarlyStopping(
-                monitor="val_loss", patience=15, restore_best_weights=True, verbose=1
+                monitor=monitor, patience=15, restore_best_weights=True, verbose=1
             ),
             ReduceLROnPlateau(
-                monitor="val_loss", factor=0.5, patience=5, min_lr=1e-7, verbose=1
+                monitor=monitor, factor=0.5, patience=5, min_lr=1e-7, verbose=1
             ),
             ModelCheckpoint(
-                filepath="best_lstm_model.h5",
-                monitor="val_loss",
+                filepath=ckpt_path,
+                monitor=monitor,
                 save_best_only=True,
-                verbose=1,
+                verbose=0,
             ),
         ]
 
@@ -303,10 +379,11 @@ class AdvancedLSTMModel:
             "train_loss": float(train_loss),
             "train_mae": float(train_mae),
             "train_mape": float(train_mape),
-            "val_loss": float(val_loss) if val_loss else None,
-            "val_mae": float(val_mae) if val_mae else None,
-            "val_mape": float(val_mape) if val_mape else None,
+            "val_loss": float(val_loss) if val_loss is not None else None,
+            "val_mae": float(val_mae) if val_mae is not None else None,
+            "val_mape": float(val_mape) if val_mape is not None else None,
             "epochs_trained": len(history.history["loss"]),
+            "checkpoint_path": ckpt_path,  # Fix 6: reported, deterministic
         }
 
     def predict(
@@ -348,29 +425,51 @@ class AdvancedLSTMModel:
                 scaled_feature = self.scaler.transform(feature_data)
             input_scaled[0, :, i] = scaled_feature.flatten()
 
-        # Predict
-        predictions_scaled = []
-        current_sequence = input_scaled.copy()
+        # Predict — Fix 5: the model head is DIRECT multi-step (one forward
+        # pass produces all forecast_horizon*n_targets outputs). The original
+        # looped one step at a time reading only pred[0, 0], mixing two
+        # incompatible strategies and dropping the remaining outputs.
+        horizon = self.forecast_horizon
+        n_targets = self.n_targets
+        univariate_single_target = (n_features == 1) and (n_targets == 1)
 
-        for step in range(forecast_steps):
-            # Predict next step
-            pred = self.model.predict(current_sequence, verbose=0)
-            predictions_scaled.append(pred[0, 0])
-
-            # Update sequence for next prediction (rolling window)
-            if step < forecast_steps - 1:
-                # Shift sequence and add prediction
+        if forecast_steps <= horizon:
+            preds_scaled = self.model.predict(input_scaled, verbose=0)[0]
+            preds_scaled = preds_scaled[: forecast_steps * n_targets]
+        elif univariate_single_target:
+            # Recursive rolling forecast for the univariate single-target case:
+            # feed the predicted scaled values back into the window.
+            preds_scaled = []
+            current_sequence = input_scaled.copy()
+            while len(preds_scaled) < forecast_steps:
+                chunk = self.model.predict(current_sequence, verbose=0)[0]
+                preds_scaled.extend(chunk.tolist())
+                # Shift window and append the first predicted step
                 current_sequence = np.roll(current_sequence, -1, axis=1)
-                current_sequence[0, -1, 0] = pred[0, 0]
+                current_sequence[0, -1, 0] = chunk[0]
+            preds_scaled = np.array(preds_scaled[:forecast_steps])
+        else:
+            raise NotImplementedError(
+                f"Recursive forecasting beyond one horizon "
+                f"(forecast_steps={forecast_steps} > horizon={horizon}) is not "
+                f"supported for multi-feature or multi-target models."
+            )
 
-        # Inverse transform predictions
-        predictions_array = np.array(predictions_scaled).reshape(-1, 1)
-        predictions_original = self.scaler.inverse_transform(predictions_array)
-        predictions_original = predictions_original.flatten().tolist()
+        # Fix 2: inverse-transform in output_dim-wide chunks so the scaler sees
+        # the column count it was fit on (the original reshaped to (-1, 1) and
+        # crashed or scrambled multi-step outputs).
+        preds_scaled = np.asarray(preds_scaled, dtype="float32").flatten()
+        n_rows = int(np.ceil(preds_scaled.size / self.output_dim))
+        pad = n_rows * self.output_dim - preds_scaled.size
+        if pad:
+            preds_scaled = np.pad(preds_scaled, (0, pad))
+        preds_scaled = preds_scaled.reshape(n_rows, self.output_dim)
+        predictions_original = self.scaler.inverse_transform(preds_scaled)
+        predictions_original = predictions_original.flatten()[:forecast_steps].tolist()
 
         # Calculate confidence intervals (simplified)
         # In production, use proper prediction intervals
-        std_dev = np.std(predictions_array)
+        std_dev = float(np.std(preds_scaled))
         confidence_lower = [p - 1.96 * std_dev for p in predictions_original]
         confidence_upper = [p + 1.96 * std_dev for p in predictions_original]
 
@@ -390,6 +489,21 @@ class AdvancedLSTMModel:
             raise RuntimeError("No model to save.")
 
         self.model.save(filepath)
+        # Persist the fitted scalers + geometry so a load into a fresh
+        # instance can predict without re-fitting (original load left
+        # self.scaler / self.feature_scalers unfitted -> NotFittedError).
+        meta = {
+            "scaler": self.scaler,
+            "feature_scalers": self.feature_scalers,
+            "sequence_length": self.sequence_length,
+            "forecast_horizon": self.forecast_horizon,
+            "n_features": self.n_features,
+            "n_targets": self.n_targets,
+            "output_dim": self.output_dim,
+            "model_type": self.model_type,
+        }
+        with open(filepath + ".meta.pkl", "wb") as fh:
+            pickle.dump(meta, fh)
         logger.info(f"Model saved to {filepath}")
 
     def load_model(self, filepath: str):
@@ -397,7 +511,30 @@ class AdvancedLSTMModel:
         if not TENSORFLOW_AVAILABLE:
             raise RuntimeError("TensorFlow is required to load models.")
 
-        self.model = keras.models.load_model(filepath)
+        self.model = keras.models.load_model(
+            filepath,
+            compile=False,
+            custom_objects={
+                "tf": tf,
+            },
+        )
+        meta_path = filepath + ".meta.pkl"
+        if os.path.exists(meta_path):
+            with open(meta_path, "rb") as fh:
+                meta = pickle.load(fh)
+            self.scaler = meta["scaler"]
+            self.feature_scalers = meta["feature_scalers"]
+            self.sequence_length = meta["sequence_length"]
+            self.forecast_horizon = meta["forecast_horizon"]
+            self.n_features = meta["n_features"]
+            self.n_targets = meta["n_targets"]
+            self.output_dim = meta["output_dim"]
+            self.model_type = meta["model_type"]
+        else:
+            # Best effort: infer geometry from the loaded graph so predict()
+            # at least works for single-target models saved without a sidecar.
+            self.output_dim = self.model.output_shape[-1]
+            self.n_targets = 1
         self.is_trained = True
         logger.info(f"Model loaded from {filepath}")
 

@@ -1,0 +1,118 @@
+{
+  "passed": 8,
+  "total": 9,
+  "results": [
+    {
+      "test": "single_step_training",
+      "passed": true,
+      "detail": "epochs=15, train_loss=0.1009, ckpt=exists",
+      "metrics": {
+        "train_loss": 0.10092587023973465,
+        "train_mae": 0.255205363035202,
+        "train_mape": 634226.1875,
+        "val_loss": 0.19662673771381378,
+        "val_mae": 0.3881717622280121,
+        "val_mape": 55.95976638793945,
+        "epochs_trained": 15,
+        "checkpoint_path": "/home/z/my-project/dof-repo/backend/ml-inference-service/models/lstm/stacked_lstm_seq20_h1_f1_t1_best.keras"
+      }
+    },
+    {
+      "test": "multi_step_training",
+      "passed": true,
+      "detail": "output_dim=4, head_output=4, val_loss=0.12097322195768356",
+      "metrics": {
+        "train_loss": 0.05891859531402588,
+        "train_mae": 0.1995955854654312,
+        "train_mape": 664856.875,
+        "val_loss": 0.12097322195768356,
+        "val_mae": 0.30945083498954773,
+        "val_mape": 48.79051971435547,
+        "epochs_trained": 15,
+        "checkpoint_path": "/home/z/my-project/dof-repo/backend/ml-inference-service/models/lstm/stacked_lstm_seq24_h4_f1_t1_best.keras"
+      }
+    },
+    {
+      "test": "three_dim_target",
+      "passed": true,
+      "detail": "n_targets=2, output_dim=6, head=6",
+      "metrics": {
+        "train_loss": 0.09330884367227554,
+        "train_mae": 0.24918928742408752,
+        "train_mape": 436617.71875,
+        "val_loss": 0.15276554226875305,
+        "val_mae": 0.3413776457309723,
+        "val_mape": 52.96503829956055,
+        "epochs_trained": 10,
+        "checkpoint_path": "/home/z/my-project/dof-repo/backend/ml-inference-service/models/lstm/stacked_lstm_seq20_h3_f1_t2_best.keras"
+      }
+    },
+    {
+      "test": "external_validation_data",
+      "passed": true,
+      "detail": "train_loss=0.0778, val_loss=0.1421, epochs=10",
+      "metrics": {
+        "train_loss": 0.07775455713272095,
+        "train_mae": 0.22928966581821442,
+        "train_mape": 605618.625,
+        "val_loss": 0.14212137460708618,
+        "val_mae": 0.32797497510910034,
+        "val_mape": 46.001712799072266,
+        "epochs_trained": 10,
+        "checkpoint_path": "/home/z/my-project/dof-repo/backend/ml-inference-service/models/lstm/stacked_lstm_seq24_h3_f1_t1_best.keras"
+      }
+    },
+    {
+      "test": "attention_softmax_time_axis",
+      "passed": true,
+      "detail": "sums_over_time=[1.0, 1.0, 1.0, 1.0, 1.0], weights_min=0.0495, weights_max=0.0504",
+      "metrics": {
+        "sums_over_time": [
+          1.0000001192092896,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "weights_min": 0.04953531175851822,
+        "weights_max": 0.0504329577088356
+      }
+    },
+    {
+      "test": "attention_training",
+      "passed": true,
+      "detail": "epochs=10, train_loss=0.2279",
+      "metrics": {
+        "train_loss": 0.2279289960861206,
+        "train_mae": 0.4225941300392151,
+        "train_mape": 168576.171875,
+        "val_loss": 0.3799811601638794,
+        "val_mae": 0.5781167149543762,
+        "val_mape": 90.02884674072266,
+        "epochs_trained": 10,
+        "checkpoint_path": "/home/z/my-project/dof-repo/backend/ml-inference-service/models/lstm/attention_seq20_h3_f1_t1_best.keras"
+      }
+    },
+    {
+      "test": "prediction_output_dims",
+      "passed": true,
+      "detail": "len(<h)=3, len(==h)=4, len(>h)=7",
+      "metrics": {}
+    },
+    {
+      "test": "save_load_roundtrip",
+      "passed": true,
+      "detail": "file_size=1677516B, pred_match=True, before=[-2.859, 0.583, -2.557]",
+      "metrics": {}
+    },
+    {
+      "test": "persistence_baseline",
+      "passed": false,
+      "detail": "LSTM_MAE=12.7128, persistence_MAE=3.2615, delta=+9.4514 (LSTM WORSE)",
+      "metrics": {
+        "lstm_mae": 12.712829146603115,
+        "persistence_mae": 3.261467218399048
+      }
+    }
+  ]
+}

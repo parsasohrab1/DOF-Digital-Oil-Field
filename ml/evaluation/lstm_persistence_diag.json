@@ -1,0 +1,8 @@
+{
+  "train_lstm_mae": 4.221531668832759,
+  "train_persistence_mae": 3.169203519821167,
+  "test_lstm_mae": 7.799283592985763,
+  "test_persistence_mae": 3.261467218399048,
+  "frac_test_above_train_max": 0.025806451612903226,
+  "frac_test_below_train_min": 0.0
+}
