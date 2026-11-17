@@ -1,0 +1,136 @@
+{
+  "dataset": "esp_features_clean.csv",
+  "provenance": "Laboratory vibration-derived ESP features (11 devices). NOT live oil-field data.",
+  "n_rows": 6032,
+  "n_devices": 11,
+  "features": [
+    "median(8,13)",
+    "rms(98,102)",
+    "median(98,102)",
+    "peak1x",
+    "peak2x",
+    "a",
+    "b"
+  ],
+  "group": "esp_id",
+  "label_counts": {
+    "Faulty sensor": 295,
+    "Misalignment": 70,
+    "Normal": 4801,
+    "Rubbing": 290,
+    "Unbalance": 576
+  },
+  "minority_class": "Misalignment",
+  "groupkfold_results": {
+    "XGBoost": {
+      "macro_f1": 0.6359683065164815,
+      "balanced_accuracy": 0.7699420217710482,
+      "accuracy": 0.9085147954068754,
+      "minority_recall_misalignment": 0.17564102564102563
+    },
+    "RandomForest_balanced": {
+      "macro_f1": 0.7017279695200452,
+      "balanced_accuracy": 0.7470116074043922,
+      "accuracy": 0.9062672511376629,
+      "minority_recall_misalignment": 0.19871794871794873
+    }
+  },
+  "leave_one_esp_out": {
+    "balanced_accuracy": 0.7057899671784945,
+    "macro_f1": 0.7182816791511015,
+    "accuracy": 0.9169429708222812,
+    "minority_recall_misalignment": 0.44285714285714284,
+    "per_device": {
+      "0": {
+        "balanced_accuracy": 0.9704419081065262,
+        "n_test": 252
+      },
+      "1": {
+        "balanced_accuracy": 0.824990865911582,
+        "n_test": 747
+      },
+      "2": {
+        "balanced_accuracy": 0.9166666666666666,
+        "n_test": 300
+      },
+      "3": {
+        "balanced_accuracy": 0.805021707399229,
+        "n_test": 420
+      },
+      "4": {
+        "balanced_accuracy": 0.6372710198167919,
+        "n_test": 800
+      },
+      "5": {
+        "balanced_accuracy": 0.7516116029726858,
+        "n_test": 830
+      },
+      "6": {
+        "balanced_accuracy": 0.798611111111111,
+        "n_test": 378
+      },
+      "7": {
+        "balanced_accuracy": 0.9795751633986929,
+        "n_test": 684
+      },
+      "8": {
+        "balanced_accuracy": 0.9908540875193471,
+        "n_test": 486
+      },
+      "9": {
+        "balanced_accuracy": 0.7151171697404574,
+        "n_test": 421
+      },
+      "10": {
+        "balanced_accuracy": 0.42564099192102506,
+        "n_test": 714
+      }
+    }
+  },
+  "classification_report": {
+    "Normal": {
+      "precision": 0.9554404145077721,
+      "recall": 0.9602166215371798,
+      "f1-score": 0.9578225638894661,
+      "support": 4801.0
+    },
+    "Unbalance": {
+      "precision": 0.905,
+      "recall": 0.9427083333333334,
+      "f1-score": 0.923469387755102,
+      "support": 576.0
+    },
+    "Faulty sensor": {
+      "precision": 0.6715542521994134,
+      "recall": 0.7762711864406779,
+      "f1-score": 0.720125786163522,
+      "support": 295.0
+    },
+    "Rubbing": {
+      "precision": 0.5412844036697247,
+      "recall": 0.4068965517241379,
+      "f1-score": 0.4645669291338583,
+      "support": 290.0
+    },
+    "Misalignment": {
+      "precision": 0.6458333333333334,
+      "recall": 0.44285714285714284,
+      "f1-score": 0.5254237288135594,
+      "support": 70.0
+    },
+    "accuracy": 0.9169429708222812,
+    "macro avg": {
+      "precision": 0.7438224807420488,
+      "recall": 0.7057899671784945,
+      "f1-score": 0.7182816791511015,
+      "support": 6032.0
+    },
+    "weighted avg": {
+      "precision": 0.9132358661883611,
+      "recall": 0.9169429708222812,
+      "f1-score": 0.9141852907765703,
+      "support": 6032.0
+    }
+  },
+  "final_model": "ml/models/esp_classifier_group_model.joblib"
+}

@@ -1,0 +1,34 @@
+{
+  "model": "ExtraTreesRegressor(n_estimators=300, min_samples_leaf=2)",
+  "features": [
+    "choke_d64",
+    "pwh_psig",
+    "oil_gravity",
+    "glr_scf_stb",
+    "D_sq",
+    "D_sqrt_Pwh",
+    "Pwh_per_GLR",
+    "GLR_per_D",
+    "log_GLR",
+    "gamma_x_GLR"
+  ],
+  "target": "ql_stb_d",
+  "group": "well",
+  "validation": "Leave-One-Well-Out (10 folds)",
+  "feature_engineering": "choke-flow terms (D^2, D*sqrt(Pwh), Pwh/GLR, GLR/D, log GLR, gamma*GLR)",
+  "lowo_overall": {
+    "mae": 2106.0666680483528,
+    "rmse": 2872.0531622312183,
+    "r2": -1.4343536822635685
+  },
+  "baseline_raw_features": {
+    "mae": 2311.018606917432,
+    "rmse": 3070.6499095660674,
+    "r2": -2.5910511571687183
+  },
+  "delta_mae_vs_raw_features": -204.95193886907919,
+  "relative_delta_pct": -8.868467707512563,
+  "random_state": 42,
+  "dataset": "ml/datasets/cleaned/sorush_field_clean.csv",
+  "provenance": "Real historical measured oil-field data (Sorush field, Barjouei et al. 2021 supplementary data). NOT live data."
+}

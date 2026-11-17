@@ -1,0 +1,42 @@
+{
+  "model": "XGBClassifier(n_estimators=400, max_depth=6, lr=0.1)",
+  "features": [
+    "median(8,13)",
+    "rms(98,102)",
+    "median(98,102)",
+    "peak1x",
+    "peak2x",
+    "a",
+    "b"
+  ],
+  "target": "label_id",
+  "label_names": {
+    "2": "Faulty sensor",
+    "4": "Misalignment",
+    "0": "Normal",
+    "3": "Rubbing",
+    "1": "Unbalance"
+  },
+  "group": "esp_id",
+  "validation": "GroupKFold(5) + Leave-One-ESP-Out",
+  "groupkfold": {
+    "macro_f1": 0.6359683065164815,
+    "balanced_accuracy": 0.7699420217710482,
+    "accuracy": 0.9085147954068754,
+    "minority_recall_misalignment": 0.17564102564102563
+  },
+  "leave_one_esp_out": {
+    "balanced_accuracy": 0.7057899671784945,
+    "macro_f1": 0.7182816791511015,
+    "accuracy": 0.9169429708222812,
+    "minority_recall_misalignment": 0.44285714285714284
+  },
+  "worst_device": {
+    "esp_id": "10",
+    "balanced_accuracy": 0.42564099192102506,
+    "n_test": 714
+  },
+  "random_state": 42,
+  "dataset": "ml/datasets/cleaned/esp_features_clean.csv",
+  "provenance": "Laboratory vibration-derived ESP features (11 devices). NOT live oil-field data."
+}
